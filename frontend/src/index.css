@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+@keyframes chartMove {
+
+  0% {
+    transform: translateX(-40px);
+  }
+
+  50% {
+    transform: translateX(40px);
+  }
+
+  100% {
+    transform: translateX(-40px);
+  }
+
+}
+
+.chart-bg {
+
+  animation:
+    chartMove
+    12s
+    ease-in-out
+    infinite;
+
+}
+
+.page-bg {
+
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+
+}
+
+.theme-main {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.theme-card {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.theme-card-soft {
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  color: var(--text);
+  border: 1px solid var(--border);
+
+}
+
+/* DARK */
+
+.theme-dark {
+
+  --bg: #020617;
+  --card: #0f172a;
+  --text: #ffffff;
+  --border: #334155;
+
+}
+
+/* LIGHT */
+
+.theme-light {
+
+  --bg: #ffffff;
+  --card: #f8fafc;
+  --text: #000000;
+  --border: #cbd5e1;
+
+}
+
+/* BLUE */
+
+.theme-blue {
+
+  --bg: #eef7ff;
+  --card: #dbebff;
+  --text: #0f3b66;
+  --border: #60a5fa;
+
+}
+
+/* GREEN */
+
+.theme-green {
+
+  --bg: #e7f7e9;
+  --card: #d7f0dc;
+  --text: #0f3d1f;
+  --border: #22c55e;
+
+}
+
+/* PURPLE */
+
+.theme-purple {
+
+  --bg: #f4edff;
+  --card: #e6d9ff;
+  --text: #3f1d66;
+  --border: #a855f7;
+
+}
+
+/* RED */
+
+.theme-red {
+
+  --bg: #fff0f1;
+  --card: #ffd7db;
+  --text: #6a1f2a;
+  --border: #fb7185;
+
+}
+
+/* ORANGE */
+
+.theme-orange {
+
+  --bg: #fff4e8;
+  --card: #ffe0bf;
+  --text: #734018;
+  --border: #fb923c;
+
+}
+
+/* YELLOW */
+
+.theme-yellow {
+
+  --bg: #fffbe5;
+  --card: #fff0b8;
+  --text: #6b5200;
+  --border: #facc15;
+
+}
