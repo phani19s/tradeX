@@ -40,6 +40,11 @@ def create_deposit_action_token(deposit_id: int, action: str):
 def create_withdrawal_action_token(withdrawal_id: int, action: str):
     return create_action_token(withdrawal_id, action, "withdrawal")
 
+def create_ticket_action_token(ticket_id: int, action: str):
+    return create_action_token(ticket_id, action, "ticket")
+
+def create_chat_action_token(user_id: int):
+    return create_action_token(user_id, "reply", "chat")
 
 def decode_action_token(token: str):
     return jwt.decode(
@@ -52,6 +57,9 @@ def decode_deposit_action_token(token: str):
     return decode_action_token(token)
 
 def decode_withdrawal_action_token(token: str):
+    return decode_action_token(token)
+
+def decode_ticket_action_token(token: str):
     return decode_action_token(token)
 ...
 def send_withdrawal_approval_email(
@@ -514,6 +522,51 @@ def send_deposit_approved_email(
         html
     )
 
+def send_auto_trade_email(
+    recipient_email: str,
+    username: str,
+    stock_symbol: str,
+    trade_type: str,
+    quantity: int,
+    price: float,
+    reason: str
+):
+    subject = f"TradeX Auto Trade Executed: {stock_symbol}"
+    
+    color = "#10b981" if trade_type == "BUY" else "#ef4444"
+    if "Take Profit" in reason: color = "#10b981"
+    if "Stop Loss" in reason: color = "#ef4444"
+
+    html = f"""
+    <html>
+    <body style="font-family:Arial;background:#f4f6f9;padding:20px;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+    <div style="background:{color};color:white;padding:20px;text-align:center;">
+        <h1>Automatic Trade Executed</h1>
+    </div>
+    <div style="padding:25px;">
+        <h2 style="color:#0f172a;">Hello {username} 👋,</h2>
+        <p style="font-size:16px;color:#475569;">An automatic trade was executed on your account based on your preset conditions.</p>
+        
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:20px;border-radius:12px;margin-top:15px;">
+            <p style="margin:8px 0;color:#0f172a;"><strong>Stock:</strong> {stock_symbol}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Action:</strong> {trade_type}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Quantity:</strong> {quantity}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Price:</strong> ₹{price:,.2f}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Reason:</strong> {reason}</p>
+        </div>
+        
+        <p style="margin-top:20px;">Your portfolio and balance have been updated accordingly.</p>
+        <p>Happy Trading 🚀</p>
+        <hr style="margin-top:30px;border:none;border-top:1px solid #e2e8f0;">
+        <p style="text-align:center;color:#64748b;font-size:14px;margin-top:20px;">TradeX Team</p>
+    </div>
+    </div>
+    </body>
+    </html>
+    """
+    _send_html_email(recipient_email, subject, html)
+
 def send_deposit_rejected_email(
     recipient_email: str,
     username: str,
@@ -626,3 +679,167 @@ def send_deposit_rejected_email(
         subject,
         html
     )
+
+def send_ticket_created_email(
+    user_email: str,
+    username: str,
+    ticket_number: str,
+    issue_type: str,
+    ticket_id: int
+):
+    # Notify Admin
+    progress_token = create_ticket_action_token(ticket_id, "progress")
+    resolve_token = create_ticket_action_token(ticket_id, "resolve")
+    
+    progress_link = f"{API_BASE_URL}/support/admin/tickets/email/progress?token={progress_token}"
+    resolve_link = f"{API_BASE_URL}/support/admin/tickets/email/resolve-form?token={resolve_token}"
+
+    admin_subject = f"New Support Ticket: {ticket_number}"
+    admin_html = f"""
+    <html>
+    <body style="font-family:Arial;background:#f4f6f9;padding:20px;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+    <div style="background:#2563eb;color:white;padding:20px;text-align:center;">
+        <h1>New Support Ticket</h1>
+    </div>
+    <div style="padding:25px;">
+        <h2 style="color:#0f172a;">Hello Admin,</h2>
+        <p style="font-size:16px;color:#475569;">A new support ticket has been raised by a user.</p>
+        
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:20px;border-radius:12px;margin-top:15px;">
+            <p style="margin:8px 0;color:#0f172a;"><strong>Ticket #:</strong> {ticket_number}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>User:</strong> {username} ({user_email})</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Issue Type:</strong> {issue_type}</p>
+        </div>
+        
+        <p style="margin-top:20px;">You can review this ticket in the Admin Panel or take action directly below:</p>
+        
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin:22px 0 18px;justify-content:center;">
+          <a href="{progress_link}" style="display:inline-block;background:#2563eb;color:white;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:700;">Progress Ticket</a>
+          <a href="{resolve_link}" style="display:inline-block;background:#16a34a;color:white;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:700;">Resolve Ticket</a>
+          <a href="{APP_BASE_URL}/admin" style="display:inline-block;background:#e2e8f0;color:#0f172a;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:700;">Admin Panel</a>
+        </div>
+
+        <hr style="margin-top:30px;border:none;border-top:1px solid #e2e8f0;">
+        <p style="text-align:center;color:#64748b;font-size:14px;margin-top:20px;">TradeX System</p>
+    </div>
+    </div>
+    </body>
+    </html>
+    """
+    _send_html_email(APPROVAL_EMAIL, admin_subject, admin_html)
+
+    # Notify User
+    user_subject = f"Ticket Received: {ticket_number}"
+    user_html = f"""
+    <html>
+    <body style="font-family:Arial;background:#f4f6f9;padding:20px;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+    <div style="background:#2563eb;color:white;padding:20px;text-align:center;">
+        <h1>Ticket Received</h1>
+    </div>
+    <div style="padding:25px;">
+        <h2 style="color:#0f172a;">Hello {username} 👋,</h2>
+        <p style="font-size:16px;color:#475569;">We have received your support ticket and our team is looking into it.</p>
+        
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:20px;border-radius:12px;margin-top:15px;">
+            <p style="margin:8px 0;color:#0f172a;"><strong>Ticket #:</strong> {ticket_number}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Issue Type:</strong> {issue_type}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Status:</strong> OPEN</p>
+        </div>
+        
+        <p style="margin-top:20px;">We will notify you once there is an update on your request.</p>
+        <p>Thank you for your patience.</p>
+        <hr style="margin-top:30px;border:none;border-top:1px solid #e2e8f0;">
+        <p style="text-align:center;color:#64748b;font-size:14px;margin-top:20px;">TradeX Team</p>
+    </div>
+    </div>
+    </body>
+    </html>
+    """
+    _send_html_email(user_email, user_subject, user_html)
+
+def send_ticket_resolved_email(
+    user_email: str,
+    username: str,
+    ticket_number: str,
+    resolution: str
+):
+    subject = f"Ticket Resolved: {ticket_number}"
+    html = f"""
+    <html>
+    <body style="font-family:Arial;background:#f4f6f9;padding:20px;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+    <div style="background:#10b981;color:white;padding:20px;text-align:center;">
+        <h1>Ticket Resolved</h1>
+    </div>
+    <div style="padding:25px;">
+        <h2 style="color:#0f172a;">Hello {username} 👋,</h2>
+        <p style="font-size:16px;color:#475569;">Your support ticket has been resolved.</p>
+        
+        <div style="background:#ecfdf5;border:1px solid #86efac;padding:20px;border-radius:12px;margin-top:15px;">
+            <p style="margin:8px 0;color:#0f172a;"><strong>Ticket #:</strong> {ticket_number}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Resolution:</strong> {resolution}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Status:</strong> RESOLVED</p>
+        </div>
+        
+        <p style="margin-top:20px;">If you have any further questions, feel free to contact us.</p>
+        <p>Happy Trading 🚀</p>
+        <hr style="margin-top:30px;border:none;border-top:1px solid #e2e8f0;">
+        <p style="text-align:center;color:#64748b;font-size:14px;margin-top:20px;">TradeX Team</p>
+    </div>
+    </div>
+    </body>
+    </html>
+    """
+    _send_html_email(user_email, subject, html)
+
+def send_chat_message_to_admin(user_id: int, user_email: str, message: str):
+    token = create_chat_action_token(user_id)
+    reply_link = f"{API_BASE_URL}/support/chat/email/reply-form?token={token}"
+    
+    subject = f"New Support Chat from {user_email}"
+    html = f"""
+    <html>
+    <body style="font-family:Arial;background:#f4f6f9;padding:20px;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+    <div style="background:#2563eb;color:white;padding:20px;text-align:center;">
+        <h1>New Chat Message</h1>
+    </div>
+    <div style="padding:25px;">
+        <p style="font-size:16px;color:#475569;"><strong>{user_email}</strong> sent a new message in the support chat:</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:20px;border-radius:12px;margin-top:15px;white-space:pre-wrap;">
+            {message}
+        </div>
+        <p style="margin-top:20px;">You can reply to this message directly in the TradeX Chat by clicking the button below:</p>
+        <div style="text-align:center;margin-top:20px;">
+            <a href="{reply_link}" style="display:inline-block;background:#10b981;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Reply in TradeX Chat</a>
+        </div>
+    </div>
+    </div>
+    </body>
+    </html>
+    """
+    _send_html_email(APPROVAL_EMAIL, subject, html, reply_to=user_email)
+
+def send_chat_message_to_user(user_email: str, message: str):
+    subject = "New Reply from TradeX Support"
+    html = f"""
+    <html>
+    <body style="font-family:Arial;background:#f4f6f9;padding:20px;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+    <div style="background:#10b981;color:white;padding:20px;text-align:center;">
+        <h1>Support Reply</h1>
+    </div>
+    <div style="padding:25px;">
+        <p style="font-size:16px;color:#475569;">TradeX Support has replied to your chat:</p>
+        <div style="background:#ecfdf5;border:1px solid #86efac;padding:20px;border-radius:12px;margin-top:15px;white-space:pre-wrap;">
+            {message}
+        </div>
+        <p style="margin-top:20px;">Log in to TradeX to continue the chat, or reply to this email to reach support.</p>
+    </div>
+    </div>
+    </body>
+    </html>
+    """
+    _send_html_email(user_email, subject, html, reply_to=APPROVAL_EMAIL)

@@ -8,6 +8,7 @@ import { getAuthHeaders, requestWithdrawal, getWithdrawalHistory } from "../api/
 import Navbar from "../components/Navbar";
 import PaymentModal from "../components/PaymentModal";
 import WithdrawModal from "../components/WithdrawModal";
+import RaiseTicketModal from "../components/RaiseTicketModal";
 import { useStocks } from "../context/StockContext";
 
 function formatMoney(value) {
@@ -34,10 +35,12 @@ function Dashboard() {
   const [data, setData] = useState(null);
   const [deposits, setDeposits] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [tickets, setTickets] = useState([]);
   const [visibleDepositCount, setVisibleDepositCount] = useState(5);
   const [visibleWithdrawalCount, setVisibleWithdrawalCount] = useState(5);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [ticketModal, setTicketModal] = useState({ isOpen: false, type: "", id: null });
   const currentUser = JSON.parse(localStorage.getItem("user") || "null");
   const isAdmin = Boolean(currentUser?.is_admin);
   const { stocks } = useStocks();
@@ -62,28 +65,52 @@ function Dashboard() {
     }
   }
 
+  async function loadTickets() {
+    try {
+      const response = await api.get("/support/tickets", getAuthHeaders());
+      setTickets(response.data);
+    } catch (error) {
+      console.error("Failed to load tickets", error);
+    }
+  }
+
   async function refreshData() {
     try {
-      await Promise.all([loadDashboard(), loadDeposits(), loadWithdrawals()]);
+      await Promise.all([loadDashboard(), loadDeposits(), loadWithdrawals(), loadTickets()]);
     } catch (error) {
       console.log(error);
     }
   }
 
   useEffect(() => {
-  
     refreshData();
-  
-    const interval =
-      setInterval(
-        refreshData,
-        10000
-      );
-  
-    return () =>
-      clearInterval(interval);
-  
+    const interval = setInterval(refreshData, 10000);
+    return () => clearInterval(interval);
   }, []);
+
+  function getTicketActionLabel(transactionId, transactionType) {
+    const ticket = tickets.find(
+      (t) => t.transaction_id === transactionId && t.transaction_type === transactionType
+    );
+
+    if (!ticket) return "Raise Ticket";
+    if (ticket.status === "OPEN") return "Ticket Rised";
+    if (ticket.status === "IN_PROGRESS") return "In Progress";
+    if (ticket.status === "RESOLVED") return "Raise Ticket";
+    if (ticket.status === "CLOSED") return "Raise Ticket";
+    return "Raise Ticket";
+  }
+
+  function getTicketActionColor(transactionId, transactionType) {
+    const ticket = tickets.find(
+      (t) => t.transaction_id === transactionId && t.transaction_type === transactionType
+    );
+
+    if (!ticket) return "text-accent";
+    if (ticket.status === "OPEN") return "text-amber-500";
+    if (ticket.status === "IN_PROGRESS") return "text-blue-500";
+    return "text-accent";
+  }
 
   async function handleUserDeposit(payload) {
     try {
@@ -335,17 +362,18 @@ function Dashboard() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b" style={{ borderColor: "var(--border)" }}>
-                      {isAdmin && <th className="px-4 py-4 text-left text-sm">Account</th>}
+                      {isAdmin && <th className="px-4 py-4 text-left text-sm">User</th>}
                       <th className="px-4 py-4 text-left text-sm">Amount</th>
                       <th className="px-4 py-4 text-left text-sm">UTR</th>
                       <th className="px-4 py-4 text-left text-sm">Status</th>
                       <th className="px-4 py-4 text-left text-sm text-nowrap">Date</th>
+                      <th className="px-4 py-4 text-left text-sm text-nowrap">Support</th>
                     </tr>
-                  </thead>
-                  <tbody>
+                    </thead>
+                    <tbody>
                     {deposits.length === 0 ? (
                       <tr>
-                        <td colSpan={isAdmin ? 5 : 4} className="px-4 py-10 text-center text-sm opacity-70">No deposits yet.</td>
+                        <td colSpan={isAdmin ? 6 : 5} className="px-4 py-10 text-center text-sm opacity-70">No deposits yet.</td>
                       </tr>
                     ) : (
                       deposits.slice(0, visibleDepositCount).map((deposit) => (
@@ -359,6 +387,21 @@ function Dashboard() {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-[10px] opacity-60">{new Date(deposit.created_at).toLocaleDateString()}</td>
+                          <td className="px-4 py-4">
+                            <button
+                              onClick={() => {
+                                const label = getTicketActionLabel(deposit.id, "DEPOSIT");
+                                if (label === "Raise Ticket") {
+                                  setTicketModal({ isOpen: true, type: "DEPOSIT", id: deposit.id });
+                                } else {
+                                  navigate("/profile/tickets");
+                                }
+                              }}
+                              className={`text-[10px] font-bold hover:underline ${getTicketActionColor(deposit.id, "DEPOSIT")}`}
+                            >
+                              {getTicketActionLabel(deposit.id, "DEPOSIT")}
+                            </button>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -400,12 +443,13 @@ function Dashboard() {
                       <th className="px-4 py-4 text-left text-sm">Bank Details</th>
                       <th className="px-4 py-4 text-left text-sm">Status</th>
                       <th className="px-4 py-4 text-left text-sm text-nowrap">Date</th>
+                      <th className="px-4 py-4 text-left text-sm text-nowrap">Support</th>
                     </tr>
                   </thead>
                   <tbody>
                     {withdrawals.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-10 text-center text-sm opacity-70">No withdrawals yet.</td>
+                        <td colSpan={5} className="px-4 py-10 text-center text-sm opacity-70">No withdrawals yet.</td>
                       </tr>
                     ) : (
                       withdrawals.slice(0, visibleWithdrawalCount).map((w) => (
@@ -431,6 +475,21 @@ function Dashboard() {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-[10px] opacity-60">{new Date(w.created_at).toLocaleDateString()}</td>
+                          <td className="px-4 py-4">
+                            <button
+                              onClick={() => {
+                                const label = getTicketActionLabel(w.id, "WITHDRAWAL");
+                                if (label === "Raise Ticket") {
+                                  setTicketModal({ isOpen: true, type: "WITHDRAWAL", id: w.id });
+                                } else {
+                                  navigate("/profile/tickets");
+                                }
+                              }}
+                              className={`text-[10px] font-bold hover:underline ${getTicketActionColor(w.id, "WITHDRAWAL")}`}
+                            >
+                              {getTicketActionLabel(w.id, "WITHDRAWAL")}
+                            </button>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -483,6 +542,13 @@ function Dashboard() {
           onSubmit={handleUserWithdraw}
         />
       )}
+
+      <RaiseTicketModal
+        isOpen={ticketModal.isOpen}
+        onClose={() => setTicketModal({ isOpen: false, type: "", id: null })}
+        transactionId={ticketModal.id}
+        transactionType={ticketModal.type}
+      />
     </div>
   );
 }

@@ -209,7 +209,6 @@ function ThemeModal({ isOpen, onClose }) {
                   <option
                     key={period.name}
                     value={period.name}
-                    style={{ color: "var(--text)", backgroundColor: "var(--card)" }}
                   >
                     {period.name}
                   </option>
@@ -271,7 +270,6 @@ function ThemeModal({ isOpen, onClose }) {
                   <option
                     key={preset.value}
                     value={preset.value}
-                    style={{ color: "var(--text)", backgroundColor: "var(--card)" }}
                   >
                     {preset.label}
                   </option>

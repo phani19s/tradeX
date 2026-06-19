@@ -289,7 +289,7 @@ def login_swagger(
     return {
         "access_token": access_token,
         "token_type": "bearer"
-    }
+    } 
 @router.get("/profile", response_model=UserResponse)
 def get_profile(
     current_user: User = Depends(get_current_user)

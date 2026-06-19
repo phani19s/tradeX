@@ -269,8 +269,11 @@ def portfolio_summary(
 
     for symbol, data in holdings.items():
 
+        # Ensure quantity is not negative
+        safe_quantity = max(0, data["quantity"])
+        
         invested_amount += (
-            data["quantity"]
+            safe_quantity
             * data["price"]
         )
     approved_deposits = (

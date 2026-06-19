@@ -38,6 +38,10 @@ class Trade(Base):
     price = Column(
         Float
     )
+    note = Column(
+        String,
+        nullable=True
+    )
     user = relationship(
     "User",
     back_populates="trades"

@@ -27,6 +27,7 @@ from app.core.email import (
     send_withdrawal_rejected_email,
     send_withdrawal_processed_admin_notification
 )
+from app.core.notifications import create_notification
 
 router = APIRouter(
     prefix="/admin",
@@ -190,6 +191,14 @@ def approve_deposit(
         deposit.amount
     )
 
+    create_notification(
+        db, 
+        deposit.user_id, 
+        "Deposit Approved", 
+        f"Your deposit of ₹{deposit.amount} has been approved.", 
+        "DEPOSIT"
+    )
+
     return {
         "message": "Deposit approved successfully",
         "balance": portfolio.balance
@@ -231,6 +240,14 @@ def reject_deposit(
         deposit.amount
     )
 
+    create_notification(
+        db, 
+        deposit.user_id, 
+        "Deposit Rejected", 
+        f"Your deposit of ₹{deposit.amount} was rejected.", 
+        "DEPOSIT"
+    )
+
     return {
         "message": "Deposit rejected successfully"
     }
@@ -264,6 +281,14 @@ def approve_withdrawal(
         withdrawal.user.username,
         withdrawal.amount,
         withdrawal.utr_number
+    )
+
+    create_notification(
+        db, 
+        withdrawal.user_id, 
+        "Withdrawal Approved", 
+        f"Your withdrawal of ₹{withdrawal.amount} has been approved. UTR: {withdrawal.utr_number}", 
+        "WITHDRAWAL"
     )
     
     try:
@@ -309,6 +334,14 @@ def reject_withdrawal(
         withdrawal.user.email,
         withdrawal.user.username,
         withdrawal.amount
+    )
+
+    create_notification(
+        db, 
+        withdrawal.user_id, 
+        "Withdrawal Rejected", 
+        f"Your withdrawal request for ₹{withdrawal.amount} was rejected.", 
+        "WITHDRAWAL"
     )
     
     try:
@@ -378,6 +411,14 @@ def approve_deposit_from_email(
         deposit.user.email,
         deposit.user.username,
         deposit.amount
+    )
+
+    create_notification(
+        db, 
+        deposit.user_id, 
+        "Deposit Approved", 
+        f"Your deposit of ₹{deposit.amount} has been approved via email verification.", 
+        "DEPOSIT"
     )
 
     # Also notify admin
@@ -458,6 +499,14 @@ def reject_deposit_from_email(
         deposit.user.email,
         deposit.user.username,
         deposit.amount
+    )
+
+    create_notification(
+        db, 
+        deposit.user_id, 
+        "Deposit Rejected", 
+        f"Your deposit of ₹{deposit.amount} was rejected via email verification.", 
+        "DEPOSIT"
     )
 
     # Also notify admin
@@ -565,6 +614,14 @@ def complete_withdrawal_from_email(
         withdrawal.utr_number
     )
     
+    create_notification(
+        db, 
+        withdrawal.user_id, 
+        "Withdrawal Approved", 
+        f"Your withdrawal of ₹{withdrawal.amount} has been approved via email. UTR: {withdrawal.utr_number}", 
+        "WITHDRAWAL"
+    )
+    
     # Notify admin as well
     try:
         send_withdrawal_processed_admin_notification(
@@ -636,6 +693,14 @@ def reject_withdrawal_from_email(
         withdrawal.user.email,
         withdrawal.user.username,
         withdrawal.amount
+    )
+
+    create_notification(
+        db, 
+        withdrawal.user_id, 
+        "Withdrawal Rejected", 
+        f"Your withdrawal request for ₹{withdrawal.amount} was rejected via email.", 
+        "WITHDRAWAL"
     )
 
     # Also notify admin

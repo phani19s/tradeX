@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 
-function StockChart({ currentPrice, previousClose }) {
+function StockChart({ symbol, currentPrice, previousClose }) {
   const [zoom, setZoom] = useState(1);
   const scrollRef = useRef(null);
 
@@ -89,37 +89,40 @@ function StockChart({ currentPrice, previousClose }) {
   ];
 
   return (
-    <div className="w-full mt-6 rounded-3xl border p-6" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
-      <div className="flex justify-between items-center mb-6">
+    <div className="w-full mt-6 rounded-3xl border p-4" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+      {/* Top Controls Area */}
+      <div className="flex justify-between items-center mb-4 pb-4 border-b" style={{ borderColor: "var(--border)" }}>
         <div>
-          <span className="text-[11px] uppercase tracking-[0.25em] opacity-50 font-black">Performance Chart</span>
+          <span className="text-[9px] uppercase tracking-[0.2em] opacity-50 font-black">{symbol} Chart</span>
         </div>
         
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 bg-black/10 rounded-xl p-1 border" style={{ borderColor: "var(--border)" }}>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-black/10 rounded-lg p-1 border px-2" style={{ borderColor: "var(--border)" }}>
               <button 
                   onClick={() => setZoom(prev => Math.min(prev + 0.5, 4))}
-                  className="w-8 h-8 flex items-center justify-center font-black bg-white/5 hover:bg-white/10 rounded-lg transition"
+                  className="w-6 h-6 flex items-center justify-center text-[10px] font-black bg-white/5 hover:bg-white/10 rounded transition"
               >+</button>
+              <span className="text-[8px] font-black opacity-40 uppercase tracking-widest">Zoom</span>
               <button 
                   onClick={() => setZoom(prev => Math.max(prev - 0.5, 1))}
-                  className="w-8 h-8 flex items-center justify-center font-black bg-white/5 hover:bg-white/10 rounded-lg transition"
+                  className="w-6 h-6 flex items-center justify-center text-[10px] font-black bg-white/5 hover:bg-white/10 rounded transition"
               >-</button>
           </div>
 
-          <div className="hidden sm:flex gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
-              <span className="text-[11px] font-bold opacity-70 uppercase tracking-wider">Price Up</span>
+          <div className="hidden sm:flex gap-3">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
+              <span className="text-[9px] font-bold opacity-70 uppercase tracking-wider">Price Up</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-[#ef4444]"></div>
-              <span className="text-[11px] font-bold opacity-70 uppercase tracking-wider">Price Down</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-[#ef4444]"></div>
+              <span className="text-[9px] font-bold opacity-70 uppercase tracking-wider">Price Down</span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Chart Area */}
       <div className="flex h-52 gap-4">
         {/* Fixed Y-Axis Labels */}
         <div className="flex flex-col justify-between text-[10px] font-bold opacity-40 py-1 min-w-[45px]">

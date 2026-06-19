@@ -8,19 +8,17 @@ function SessionTimeout({ timeoutMinutes = 15 }) {
   const timerRef = useRef(null);
 
   const logout = useCallback((message = "Your session has expired due to inactivity.") => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    // Check if we recently clicked "Stay Login" to avoid redundant prompts (especially from 401 loops)
+    const lastStay = parseInt(localStorage.getItem("tradex_stay_login_timestamp") || "0");
+    const now = Date.now();
+    
+    // If it was less than 15 minutes ago, don't show the timeout again
+    if (now - lastStay < 15 * 60 * 1000) return;
+
     // Notify other tabs
-    localStorage.setItem("tradex_session_status", "expired_" + Date.now());
+    localStorage.setItem("tradex_session_status", "expired_" + now);
     setExpiryMessage(message);
     setIsTimedOut(true);
-  }, []);
-
-  const stayLogin = useCallback(() => {
-    setIsTimedOut(false);
-    resetTimer();
-    // Notify other tabs to also reset/stay logged in
-    localStorage.setItem("tradex_session_status", "stay_" + Date.now());
   }, []);
 
   const resetTimer = useCallback(() => {
@@ -32,15 +30,33 @@ function SessionTimeout({ timeoutMinutes = 15 }) {
     }
   }, [logout, timeoutMinutes]);
 
+  const stayLogin = useCallback(() => {
+    setIsTimedOut(false);
+    resetTimer();
+    // Update last activity and session status to sync other tabs
+    const now = Date.now().toString();
+    localStorage.setItem("tradex_stay_login_timestamp", now);
+    localStorage.setItem("tradex_last_activity", now);
+    localStorage.setItem("tradex_session_status", "stay_" + now);
+  }, [resetTimer]);
+
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === "tradex_session_status") {
-        if (e.newValue && e.newValue.startsWith("expired_")) {
-          setIsTimedOut(true);
-        } else if (e.newValue && e.newValue.startsWith("stay_")) {
-          setIsTimedOut(false);
-          resetTimer();
+        if (e.newValue) {
+          if (e.newValue.startsWith("expired_")) {
+            // Check if we recently stayed before showing the modal from another tab's notification
+            const lastStay = parseInt(localStorage.getItem("tradex_stay_login_timestamp") || "0");
+            if (Date.now() - lastStay < 15 * 60 * 1000) return;
+            
+            setIsTimedOut(true);
+          } else if (e.newValue.startsWith("stay_")) {
+            setIsTimedOut(false);
+            resetTimer();
+          }
         }
+      } else if (e.key === "tradex_last_activity") {
+        if (!isTimedOut) resetTimer();
       }
     };
 
@@ -61,9 +77,19 @@ function SessionTimeout({ timeoutMinutes = 15 }) {
     ];
 
     const handleActivity = () => {
-      if (!isTimedOut) {
-        resetTimer();
+      // Don't reset activity if we're already showing the timeout modal
+      const currentStatus = localStorage.getItem("tradex_session_status");
+      if (currentStatus && currentStatus.startsWith("expired_")) return;
+
+      const now = Date.now();
+      const lastSync = parseInt(localStorage.getItem("tradex_last_activity") || "0");
+      
+      // Only sync to localStorage once every 30 seconds to avoid performance issues
+      if (now - lastSync > 30000) {
+        localStorage.setItem("tradex_last_activity", now.toString());
       }
+      
+      resetTimer();
     };
 
     events.forEach((event) => window.addEventListener(event, handleActivity));

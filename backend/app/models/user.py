@@ -45,3 +45,19 @@ class User(Base):
         "Trade",
         back_populates="user"
     )
+
+    support_tickets = relationship(
+        "SupportTicket",
+        back_populates="user"
+    )
+
+    support_messages = relationship(
+        "SupportMessage",
+        back_populates="user"
+    )
+
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )

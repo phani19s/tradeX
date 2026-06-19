@@ -1,18 +1,30 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
+import SupportChatModal from "../components/SupportChatModal";
 import { getProfile, updateProfile, changePassword } from "../api/authApi";
 
 function Profile() {
-  const [profile, setProfile] = useState({
-    username: "",
-    email: "",
-    phone_number: "",
-    account_holder_name: "",
-    account_number: "",
-    ifsc_code: "",
-    bank_name: "",
-    upi_id: "",
+  const [profile, setProfile] = useState(() => {
+    const cached = localStorage.getItem("user");
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        console.error("Failed to parse cached user", e);
+      }
+    }
+    return {
+      username: "",
+      email: "",
+      phone_number: "",
+      account_holder_name: "",
+      account_number: "",
+      ifsc_code: "",
+      bank_name: "",
+      upi_id: "",
+    };
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -21,19 +33,42 @@ function Profile() {
     confirm_password: "",
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!localStorage.getItem("user"));
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     loadProfile();
+
+    const handleOpenChat = () => {
+      setIsChatOpen(true);
+    };
+
+    const handleStorageChange = (e) => {
+      if (e.key === "tradex_session_status" && e.newValue && e.newValue.startsWith("stay_")) {
+        loadProfile();
+      }
+    };
+
+    window.addEventListener("tradex_open_chat", handleOpenChat);
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("tradex_open_chat", handleOpenChat);
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, []);
 
   const loadProfile = async () => {
     try {
       const response = await getProfile();
       setProfile(response.data);
+      // Update cache
+      localStorage.setItem("user", JSON.stringify(response.data));
       setLoading(false);
     } catch (error) {
-      toast.error("Failed to load profile");
+      if (error.response?.status !== 401) {
+        toast.error("Failed to load profile");
+      }
+      // Stop loading even on 401 so cached data (if any) is visible
       setLoading(false);
     }
   };
@@ -273,10 +308,54 @@ function Profile() {
                   </div>
                 </div>
               </div>
+
+              {/* Help & Support Box */}
+              <div className="rounded-[28px] border p-6 shadow-xl space-y-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-2xl font-bold">Help & Support</h2>
+                  <Link 
+                    to="/profile/tickets" 
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-white transition hover:opacity-90 shadow-lg"
+                    style={{ background: "var(--accent)" }}
+                  >
+                    My Tickets
+                  </Link>
+                </div>
+                <p className="text-sm opacity-70">Having issues? Reach out to our team for assistance.</p>
+                
+                <div className="space-y-4 pt-2">
+                  <button
+                    onClick={() => setIsChatOpen(true)}
+                    className="w-full rounded-2xl p-4 border border-dashed flex justify-center items-center gap-2 font-bold text-lg transition hover:bg-white/5"
+                    style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                  >
+                    <span>💬</span> Chat With Us
+                  </button>
+
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <p className="text-xs font-bold uppercase tracking-wider opacity-50 mb-1">Account Issues</p>
+                    <a href="mailto:tradex.support@gmail.com" className="text-sm md:text-lg font-bold hover:text-accent transition">
+                      tradex.support@gmail.com
+                    </a>
+                  </div>
+                  
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <p className="text-xs font-bold uppercase tracking-wider opacity-50 mb-1">Payment Related</p>
+                    <a href="mailto:tradex.adminn@gmail.com" className="text-sm md:text-lg font-bold hover:text-accent transition">
+                      tradex.adminn@gmail.com
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
+      
+      <SupportChatModal 
+        isOpen={isChatOpen} 
+        onClose={() => setIsChatOpen(false)} 
+      />
     </div>
   );
 }

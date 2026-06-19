@@ -86,6 +86,11 @@ function Watchlist() {
   const availableCount = stockOptions.length;
   const canAdd = Boolean(stockId);
 
+  const mergedWatchlist = watchlist.map(item => {
+    const liveStock = stockOptions.find(s => s.id === item.stock_id);
+    return liveStock ? { ...item, ...liveStock } : item;
+  });
+
   return (
     <div className="page-bg">
       <Navbar />
@@ -220,7 +225,7 @@ function Watchlist() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {watchlist.length === 0 ? (
+            {mergedWatchlist.length === 0 ? (
               <div
                 className="sm:col-span-2 xl:col-span-3 rounded-3xl border px-6 py-14 text-center shadow-lg"
                 style={{ background: "var(--card)", borderColor: "var(--border)" }}
@@ -236,95 +241,66 @@ function Watchlist() {
                 </p>
               </div>
             ) : (
-              watchlist.map((stock) => (
-                <div
-                  key={stock.stock_id}
-                  className="rounded-3xl border p-5 shadow-lg transition hover:-translate-y-1"
-                  style={{ background: "var(--card)", borderColor: "var(--border)" }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div
-                        className="inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]"
-                        style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
-                      >
-                        Watchlist
+              mergedWatchlist.map((stock) => {
+                const prevClose = Number(stock.previous_close) || Number(stock.current_price) || 1;
+                const currentPrice = Number(stock.current_price) || 0;
+                const up = currentPrice >= prevClose;
+                const change = ((currentPrice - prevClose) / prevClose) * 100;
+
+                return (
+                  <div
+                    key={stock.stock_id}
+                    className="rounded-3xl border p-5 shadow-lg transition hover:-translate-y-1"
+                    style={{ background: "var(--card)", borderColor: "var(--border)" }}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div
+                          className="inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]"
+                          style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                        >
+                          Watchlist
+                        </div>
+                        <h3 className="mt-3 text-2xl font-black">{stock.symbol}</h3>
+                        <p className="mt-1 text-sm opacity-70">{stock.company_name}</p>
                       </div>
-                      <h3 className="mt-3 text-2xl font-black">{stock.symbol}</h3>
-                      <p className="mt-1 text-sm opacity-70">{stock.company_name}</p>
+
+                      <div
+                        className="rounded-2xl px-3 py-2 text-right"
+                        style={{ background: "var(--surface)" }}
+                      >
+                        <p className="text-xs uppercase tracking-[0.2em] opacity-60">
+                          Price
+                        </p>
+                        <p className="mt-1 text-lg font-bold">
+                          Rs. {formatPrice(stock.current_price)}
+                        </p>
+                        <p
+                          className={`mt-1 text-xs font-semibold ${
+                            up ? "text-emerald-500" : "text-rose-500"
+                          }`}
+                        >
+                          {up
+                            ? `▲ ${change.toFixed(2)}%`
+                            : `▼ ${Math.abs(change).toFixed(2)}%`}
+                        </p>
+                      </div>
                     </div>
 
-                    <div
-                      className="rounded-2xl px-3 py-2 text-right"
-                      style={{ background: "var(--surface)" }}
-                    >
-                      <p className="text-xs uppercase tracking-[0.2em] opacity-60">
-                        Price
-                      </p>
-                      <p className="mt-1 text-lg font-bold">
-                        Rs. {formatPrice(stock.current_price)}
-                      </p>
-                        {stock.previous_close &&
-                            Number(stock.previous_close) > 0 ? (
-                           
-                             Number(stock.current_price) >
-                             Number(stock.previous_close) ? (
-                           
-                               <p className="mt-1 text-xs font-semibold text-emerald-500">
-                                 ▲{" "}
-                                 {(
-                                   (
-                                     Number(stock.current_price) -
-                                     Number(stock.previous_close)
-                                   ) /
-                                   Number(stock.previous_close)
-                                 * 100
-                                 ).toFixed(2)}
-                                 %
-                               </p>
-                           
-                             ) : (
-                           
-                               <p className="mt-1 text-xs font-semibold text-rose-500">
-                                 ▼{" "}
-                                 {Math.abs(
-                                   (
-                                     (
-                                       Number(stock.current_price) -
-                                       Number(stock.previous_close)
-                                     ) /
-                                     Number(stock.previous_close)
-                                   ) * 100
-                                 ).toFixed(2)}
-                                 %
-                               </p>
-                           
-                             )
-                           
-                          )  : (
-                        
-                          <p className="mt-1 text-xs font-semibold text-slate-500">
-                            LIVE
-                          </p>
-                        
-                        )}
-                    
+                    <div className="mt-5 flex items-center justify-between gap-3">
+                      <span className="text-sm opacity-70">Tracking active</span>
+                      <button
+                        type="button"
+                        onClick={() => removeStock(stock.stock_id)}
+                        className="rounded-xl border px-4 py-2 text-sm font-semibold transition hover:bg-red-500 hover:text-white"
+                        style={{ borderColor: "var(--border)" }}
+                      >
+                        Remove
+                      </button>
                     </div>
                   </div>
-
-                  <div className="mt-5 flex items-center justify-between gap-3">
-                    <span className="text-sm opacity-70">Tracking active</span>
-                    <button
-                      type="button"
-                      onClick={() => removeStock(stock.stock_id)}
-                      className="rounded-xl border px-4 py-2 text-sm font-semibold transition hover:bg-red-500 hover:text-white"
-                      style={{ borderColor: "var(--border)" }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

@@ -13,6 +13,7 @@ function formatMoney(value) {
 
 function History() {
   const [trades, setTrades] = useState([]);
+  const [targets, setTargets] = useState([]);
 
   async function fetchTrades() {
     try {
@@ -23,16 +24,47 @@ function History() {
     }
   }
 
+  async function fetchTargets() {
+    try {
+      const response = await api.get("/trade/sl-tp", getAuthHeaders());
+      setTargets(response.data);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   useEffect(() => {
     fetchTrades();
+    fetchTargets();
   }, []);
 
   const summary = useMemo(() => {
     const buys = trades.filter((trade) => trade.trade_type === "BUY").length;
     const sells = trades.filter((trade) => trade.trade_type === "SELL").length;
+    
+    // Target Orders are SL/TP (where buy_price is null)
+    const targetCount = targets.filter(o => o.buy_price === null).length;
+    // Auto Buy Orders are Limit Buys (where buy_price is NOT null)
+    const autoBuyCount = targets.filter(o => o.buy_price !== null).length;
 
-    return { buys, sells, total: trades.length };
-  }, [trades]);
+    return { buys, sells, targetCount, autoBuyCount, total: trades.length };
+  }, [trades, targets]);
+
+  const allActivity = useMemo(() => {
+    const limitOrders = targets
+      .filter((o) => o.buy_price !== null)
+      .map((o) => ({
+        stock_symbol: o.symbol,
+        company_name: "Limit Buy Order",
+        trade_type: "LIMIT BUY",
+        quantity: o.quantity,
+        price: o.buy_price,
+        note: "Pending Execution",
+        isPending: true,
+      }));
+
+    return [...limitOrders, ...trades];
+  }, [trades, targets]);
 
   return (
     <div className="page-bg">
@@ -57,11 +89,13 @@ function History() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-5">
           {[
             { label: "Total Trades", value: summary.total },
             { label: "Buy Orders", value: summary.buys },
             { label: "Sell Orders", value: summary.sells },
+            { label: "Target Orders", value: summary.targetCount },
+            { label: "Auto Buy Orders", value: summary.autoBuyCount },
           ].map((item) => (
             <div
               key={item.label}
@@ -101,20 +135,21 @@ function History() {
                   <th className="px-4 py-4 text-left text-sm">Stock</th>
                   <th className="px-4 py-4 text-left text-sm">Quantity</th>
                   <th className="px-4 py-4 text-left text-sm">Price</th>
+                  <th className="px-4 py-4 text-left text-sm">Status / Note</th>
                 </tr>
               </thead>
               <tbody>
-                {trades.length === 0 ? (
+                {allActivity.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-sm opacity-70">
-                      No trades yet.
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm opacity-70">
+                      No activity yet.
                     </td>
                   </tr>
                 ) : (
-                  trades.map((trade, index) => (
+                  allActivity.map((trade, index) => (
                     <tr
                       key={`${trade.stock_symbol}-${index}`}
-                      className="border-b last:border-b-0"
+                      className={`border-b last:border-b-0 ${trade.isPending ? "opacity-70 bg-accent/5" : ""}`}
                       style={{ borderColor: "var(--border)" }}
                     >
                       <td className="px-4 py-4">
@@ -122,6 +157,8 @@ function History() {
                           className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
                             trade.trade_type === "BUY"
                               ? "bg-emerald-500/15 text-emerald-500"
+                              : trade.trade_type === "LIMIT BUY"
+                              ? "bg-amber-500/15 text-amber-500"
                               : "bg-rose-500/15 text-rose-500"
                           }`}
                         >
@@ -134,6 +171,11 @@ function History() {
                       </td>
                       <td className="px-4 py-4">{trade.quantity}</td>
                       <td className="px-4 py-4 font-semibold">₹{formatMoney(trade.price)}</td>
+                      <td className="px-4 py-4">
+                        <div className="text-xs italic opacity-70">
+                          {trade.note || (trade.trade_type === "BUY" ? "Manual Purchase" : "Manual Sale")}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}

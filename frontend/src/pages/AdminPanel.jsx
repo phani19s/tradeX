@@ -7,6 +7,7 @@ import api from "../api/api";
 import { getAuthHeaders } from "../api/authApi";
 import Navbar from "../components/Navbar";
 import UtrModal from "../components/UtrModal";
+import SupportManagementAdmin from "../components/SupportManagementAdmin";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("en-IN", {
@@ -388,6 +389,9 @@ function AdminPanel() {
             </div>
           </div>
         </div>
+
+        <SupportManagementAdmin />
+
       </div>
 
       <UtrModal

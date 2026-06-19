@@ -13,6 +13,8 @@ import Watchlist from "./pages/Watchlist";
 import Register from "./pages/Register";
 import AdminPanel from "./pages/AdminPanel";
 import Profile from "./pages/Profile";
+import Tickets from "./pages/Tickets";
+import TicketDetail from "./pages/TicketDetail";
 import SessionTimeout from "./components/SessionTimeout";
 
 function App() {
@@ -65,6 +67,16 @@ function App() {
         <Route
           path="/profile"
           element={<Profile />}
+        />
+        
+        <Route
+          path="/profile/tickets"
+          element={<Tickets />}
+        />
+        
+        <Route
+          path="/profile/tickets/:id"
+          element={<TicketDetail />}
         />
         
       </Routes>

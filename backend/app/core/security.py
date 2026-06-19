@@ -50,7 +50,7 @@ def create_access_token(
 
     expire = (
         datetime.utcnow()
-        + timedelta(minutes=30)
+        + timedelta(days=7)
     )
 
     to_encode.update(

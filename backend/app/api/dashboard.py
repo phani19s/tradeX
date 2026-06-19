@@ -40,23 +40,24 @@ def dashboard(
         .all()
     )
 
-    invested_amount = 0
+    # Calculate invested amount based on current holdings
+    holdings = {}
+    last_buy_price = {}
 
     for trade in trades:
+        if trade.stock_id not in holdings:
+            holdings[trade.stock_id] = 0
 
         if trade.trade_type == "BUY":
-
-            invested_amount += (
-                trade.quantity *
-                trade.price
-            )
-
+            holdings[trade.stock_id] += trade.quantity
+            last_buy_price[trade.stock_id] = trade.price
         else:
+            holdings[trade.stock_id] -= trade.quantity
 
-            invested_amount -= (
-                trade.quantity *
-                trade.price
-            )
+    invested_amount = 0
+    for stock_id, quantity in holdings.items():
+        if quantity > 0:
+            invested_amount += quantity * last_buy_price.get(stock_id, 0)
 
     return {
         "cash_balance": portfolio.balance,

@@ -11,6 +11,8 @@ from app.models.stock import Stock
 from app.models.portfolio import Portfolio
 
 from app.schemas.trade import TradeCreate 
+from app.schemas.sltp import SLTPCreate, SLTPResponse
+from app.models.sltp import SLTPOrder
 from app.core.security import get_current_user 
 from app.models.user import User
 
@@ -192,6 +194,7 @@ def trade_history(
         .filter(
             Trade.user_id == user_id
         )
+        .order_by(Trade.id.desc())
         .all()
     )
 
@@ -213,7 +216,8 @@ def trade_history(
                 "company_name": stock.company_name,
                 "trade_type": trade.trade_type,
                 "quantity": trade.quantity,
-                "price": trade.price
+                "price": trade.price,
+                "note": trade.note
             }
         )
 
@@ -292,3 +296,132 @@ def holdings(
             )
 
     return result
+
+@router.post("/limit-buy")
+def set_limit_buy(
+    payload: SLTPCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Check if stock exists
+    stock = db.query(Stock).filter(Stock.id == payload.stock_id).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+
+    # Check if user has enough balance
+    portfolio = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        raise HTTPException(status_code=400, detail="Portfolio not found")
+
+    # Create new Limit Buy order
+    order = SLTPOrder(
+        user_id=current_user.id,
+        stock_id=payload.stock_id,
+        buy_price=payload.buy_price,
+        quantity=payload.quantity
+    )
+    db.add(order)
+
+    db.commit()
+    return {"message": "Limit Buy Order Set Successfully"}
+
+@router.post("/sl-tp")
+def set_sl_tp(
+    payload: SLTPCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Check if stock exists
+    stock = db.query(Stock).filter(Stock.id == payload.stock_id).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="Stock not found")
+
+    # Check if user has enough shares
+    owned = get_owned_quantity(db, current_user.id, payload.stock_id)
+    if owned < payload.quantity:
+        raise HTTPException(status_code=400, detail=f"You only own {owned} shares")
+
+    # Create new SLTP order
+    order = SLTPOrder(
+        user_id=current_user.id,
+        stock_id=payload.stock_id,
+        sl_price=payload.sl_price,
+        tp_price=payload.tp_price,
+        quantity=payload.quantity
+    )
+    db.add(order)
+
+    db.commit()
+    return {"message": "SL/TP Target Set Successfully"}
+
+@router.get("/sl-tp")
+def get_sl_tp(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    orders = db.query(SLTPOrder).filter(
+        SLTPOrder.user_id == current_user.id,
+        SLTPOrder.is_active == True
+    ).all()
+    
+    result = []
+    for order in orders:
+        stock = db.query(Stock).filter(Stock.id == order.stock_id).first()
+        result.append({
+            "id": order.id,
+            "stock_id": order.stock_id,
+            "symbol": stock.symbol,
+            "sl_price": order.sl_price,
+            "tp_price": order.tp_price,
+            "buy_price": order.buy_price,
+            "quantity": order.quantity
+        })
+    return result
+
+@router.delete("/sl-tp/{order_id}")
+def delete_sl_tp(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    order = db.query(SLTPOrder).filter(
+        SLTPOrder.id == order_id,
+        SLTPOrder.user_id == current_user.id
+    ).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    db.delete(order)
+    db.commit()
+    return {"message": "Order cancelled successfully"}
+
+@router.patch("/sl-tp/{order_id}")
+def update_sl_tp_order(
+    order_id: int,
+    new_price: float = None,
+    new_quantity: int = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    order = db.query(SLTPOrder).filter(
+        SLTPOrder.id == order_id,
+        SLTPOrder.user_id == current_user.id
+    ).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    if new_price is not None:
+        if order.buy_price is not None:
+            order.buy_price = new_price
+        elif order.tp_price is not None:
+            order.tp_price = new_price
+        elif order.sl_price is not None:
+            order.sl_price = new_price
+            
+    if new_quantity is not None:
+        order.quantity = new_quantity
+        
+    db.commit()
+    return {"message": "Order updated successfully"}
