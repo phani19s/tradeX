@@ -16,6 +16,11 @@ import Profile from "./pages/Profile";
 import Tickets from "./pages/Tickets";
 import TicketDetail from "./pages/TicketDetail";
 import SessionTimeout from "./components/SessionTimeout";
+import LoginHistory from "./pages/LoginHistory";
+import ForgotPassword from "./pages/ForgotPassword";
+import AiAssistant from "./pages/AiAssistant";
+import Alerts from "./pages/Alerts";
+import RiskDashboard from "./pages/RiskDashboard";
 
 function App() {
   return (
@@ -33,6 +38,11 @@ function App() {
         <Route
           path="/register"
           element={<Register />}
+        />
+
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
         />
         <Route
           path="/portfolio"
@@ -52,6 +62,21 @@ function App() {
         <Route
           path="/history"
           element={<History />}
+        />
+
+        <Route
+          path="/ai-assistant"
+          element={<AiAssistant />}
+        />
+
+        <Route
+          path="/alerts"
+          element={<Alerts />}
+        />
+
+        <Route
+          path="/risk-dashboard"
+          element={<RiskDashboard />}
         />
 
         <Route
@@ -79,6 +104,16 @@ function App() {
           element={<TicketDetail />}
         />
         
+        <Route
+          path="/profile/login-history"
+          element={<LoginHistory />}
+        />
+
+        <Route
+          path="/login-history"
+          element={<LoginHistory />}
+        />
+
       </Routes>
 
     </BrowserRouter>

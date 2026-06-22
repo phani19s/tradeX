@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { toast } from "react-toastify";
 
@@ -44,7 +44,8 @@ function Dashboard() {
   const currentUser = JSON.parse(localStorage.getItem("user") || "null");
   const isAdmin = Boolean(currentUser?.is_admin);
   const { stocks } = useStocks();
-   const navigate = useNavigate();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   async function loadDashboard() {
     const response = await api.get("/dashboard/", getAuthHeaders());
@@ -87,6 +88,20 @@ function Dashboard() {
     const interval = setInterval(refreshData, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!location.hash) return;
+
+    const sectionId = location.hash.slice(1);
+    const timer = window.setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+
+    return () => window.clearTimeout(timer);
+  }, [location.hash, deposits.length, withdrawals.length]);
 
   function getTicketActionLabel(transactionId, transactionType) {
     const ticket = tickets.find(
@@ -356,7 +371,7 @@ function Dashboard() {
           </div>
 
           <div className="mt-6 grid gap-8 lg:grid-cols-2">
-            <div>
+            <div id="deposits">
               <h3 className="text-lg font-bold mb-4">Deposits</h3>
               <div className="overflow-hidden rounded-3xl border" style={{ borderColor: "var(--border)" }}>
                 <table className="w-full">
@@ -433,7 +448,7 @@ function Dashboard() {
               </div>
             </div>
 
-            <div>
+            <div id="withdrawals">
               <h3 className="text-lg font-bold mb-4">Withdrawals</h3>
               <div className="overflow-hidden rounded-3xl border" style={{ borderColor: "var(--border)" }}>
                 <table className="w-full">

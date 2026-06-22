@@ -210,13 +210,40 @@ def trade_history(
             .first()
         )
 
+        latest_buy = (
+            db.query(Trade)
+            .filter(
+                Trade.user_id == user_id,
+                Trade.stock_id == trade.stock_id,
+                Trade.trade_type == "BUY",
+                Trade.id <= trade.id
+            )
+            .order_by(Trade.id.desc())
+            .first()
+        )
+
+        buy_price = latest_buy.price if latest_buy else trade.price
+        current_price = stock.current_price if stock else trade.price
+        profit_loss = (
+            (current_price - buy_price) * trade.quantity
+            if buy_price is not None and current_price is not None
+            else 0
+        )
+
         history.append(
             {
+                "id": trade.id,
+                "stock_id": trade.stock_id,
                 "stock_symbol": stock.symbol,
                 "company_name": stock.company_name,
                 "trade_type": trade.trade_type,
                 "quantity": trade.quantity,
                 "price": trade.price,
+                "buy_price": buy_price,
+                "current_price": current_price,
+                "profit_loss": profit_loss,
+                "trade_value": trade.price * trade.quantity,
+                "current_value": current_price * trade.quantity,
                 "note": trade.note
             }
         )
@@ -341,6 +368,24 @@ def set_sl_tp(
     if owned < payload.quantity:
         raise HTTPException(status_code=400, detail=f"You only own {owned} shares")
 
+    assigned_quantity = (
+        db.query(SLTPOrder)
+        .filter(
+            SLTPOrder.user_id == current_user.id,
+            SLTPOrder.stock_id == payload.stock_id,
+            SLTPOrder.is_active == True,
+            SLTPOrder.buy_price == None
+        )
+        .all()
+    )
+    available_quantity = owned - sum(order.quantity for order in assigned_quantity)
+
+    if available_quantity < payload.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail="Not available stocks"
+        )
+
     # Create new SLTP order
     order = SLTPOrder(
         user_id=current_user.id,
@@ -401,6 +446,8 @@ def update_sl_tp_order(
     order_id: int,
     new_price: float = None,
     new_quantity: int = None,
+    sl_price: float = None,
+    tp_price: float = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -419,6 +466,12 @@ def update_sl_tp_order(
             order.tp_price = new_price
         elif order.sl_price is not None:
             order.sl_price = new_price
+
+    if sl_price is not None:
+        order.sl_price = sl_price
+
+    if tp_price is not None:
+        order.tp_price = tp_price
             
     if new_quantity is not None:
         order.quantity = new_quantity

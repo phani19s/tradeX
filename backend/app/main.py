@@ -23,9 +23,14 @@ from app.models.deposit import Deposit
 from app.models.sltp import SLTPOrder
 from app.models.support import SupportTicket, SupportMessage
 from app.models.notification import Notification
+from app.models.user_session import UserSession
+from app.models.login_history import LoginHistory
+from app.models.chat_history import ChatHistory
+from app.models.price_alert import PriceAlert
 from app.seed_stocks import seed_stocks
 from app.core.email import send_auto_trade_email
 from app.core.notifications import create_notification
+from app.services.alert_service import check_price_alerts
 
 # Import Routers
 from app.api.auth import router as auth_router
@@ -38,6 +43,11 @@ from app.api.dashboard import router as dashboard_router
 from app.api.withdrawal import router as withdrawal_router
 from app.api.support import router as support_router
 from app.api.notifications import router as notifications_router
+from app.api.login_history import router as login_history_router
+from app.api.ai import router as ai_router
+from app.api.alerts import router as alerts_router
+from app.api.risk import router as risk_router
+from app.api.websocket import router as websocket_router
 
 # Create Tables
 Base.metadata.create_all(bind=engine)
@@ -60,6 +70,14 @@ def ensure_user_profile_columns():
             connection.exec_driver_sql("ALTER TABLE users ADD COLUMN bank_name VARCHAR")
         if "upi_id" not in user_columns:
             connection.exec_driver_sql("ALTER TABLE users ADD COLUMN upi_id VARCHAR")
+        if "two_factor_enabled" not in user_columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        if "two_factor_method" not in user_columns:
+            connection.exec_driver_sql("ALTER TABLE users ADD COLUMN two_factor_method VARCHAR")
+        if "two_factor_secret" not in user_columns:
+            connection.exec_driver_sql("ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR")
 
 
 def ensure_admin_column():
@@ -280,10 +298,23 @@ def update_stock_prices_forever():
                                     order.is_active = False
             
             db.commit()
+            check_price_alerts(db)
         finally:
             db.close()
 
         time.sleep(45)
+
+
+def check_alerts_forever():
+    while True:
+        db = SessionLocal()
+
+        try:
+            check_price_alerts(db)
+        finally:
+            db.close()
+
+        time.sleep(30)
 
 def ensure_withdrawal_columns():
     inspector = inspect(engine)
@@ -306,6 +337,77 @@ def ensure_withdrawal_columns():
             connection.exec_driver_sql("ALTER TABLE withdrawals ADD COLUMN processed_at TIMESTAMP")
 
 
+def ensure_security_tracking_columns():
+    inspector = inspect(engine)
+    dialect_name = engine.dialect.name
+
+    with engine.begin() as connection:
+        if "user_sessions" in inspector.get_table_names():
+            session_columns = [column["name"] for column in inspector.get_columns("user_sessions")]
+
+            if "session_token_id" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN session_token_id VARCHAR")
+                id_expression = "CAST(id AS VARCHAR)" if dialect_name == "postgresql" else "id"
+                connection.exec_driver_sql(
+                    f"UPDATE user_sessions SET session_token_id = 'legacy:' || {id_expression} WHERE session_token_id IS NULL"
+                )
+            if "ip_address" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN ip_address VARCHAR")
+            if "device" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN device VARCHAR")
+            if "browser" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN browser VARCHAR")
+            if "location" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN location VARCHAR")
+            if "is_active" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE")
+            if "created_at" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            if "last_activity" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN last_activity TIMESTAMP")
+            if "revoked_at" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN revoked_at TIMESTAMP")
+            if "logout_time" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN logout_time TIMESTAMP")
+            if "status" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN status VARCHAR")
+            if "session_duration" not in session_columns:
+                connection.exec_driver_sql("ALTER TABLE user_sessions ADD COLUMN session_duration INTEGER")
+
+            connection.exec_driver_sql(
+                "UPDATE user_sessions SET status = 'Active' WHERE status IS NULL"
+            )
+            connection.exec_driver_sql(
+                "UPDATE user_sessions SET last_activity = created_at WHERE last_activity IS NULL"
+            )
+
+        if "login_history" in inspector.get_table_names():
+            history_columns = [column["name"] for column in inspector.get_columns("login_history")]
+
+            if "ip_address" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN ip_address VARCHAR")
+            if "session_id" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN session_id VARCHAR")
+            if "device" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN device VARCHAR")
+            if "browser" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN browser VARCHAR")
+            if "location" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN location VARCHAR")
+            if "login_time" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            if "logout_time" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN logout_time TIMESTAMP")
+            if "session_duration" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN session_duration INTEGER")
+            if "status" not in history_columns:
+                connection.exec_driver_sql("ALTER TABLE login_history ADD COLUMN status VARCHAR")
+
+            connection.exec_driver_sql(
+                "UPDATE login_history SET status = 'Success' WHERE status IS NULL"
+            )
+
+
 app = FastAPI(
     title="TradeX API"
 )
@@ -316,10 +418,12 @@ ensure_deposit_columns()
 ensure_stock_columns()
 ensure_withdrawal_columns()
 ensure_trade_columns()
+ensure_security_tracking_columns()
 seed_admin_user()
 seed_stocks()
 
 price_worker_started = False
+alert_worker_started = False
 
 
 def start_price_worker_once():
@@ -332,6 +436,21 @@ def start_price_worker_once():
 
     worker = threading.Thread(
         target=update_stock_prices_forever,
+        daemon=True
+    )
+    worker.start()
+
+
+def start_alert_worker_once():
+    global alert_worker_started
+
+    if alert_worker_started:
+        return
+
+    alert_worker_started = True
+
+    worker = threading.Thread(
+        target=check_alerts_forever,
         daemon=True
     )
     worker.start()
@@ -357,8 +476,14 @@ app.include_router(dashboard_router)
 app.include_router(withdrawal_router)
 app.include_router(support_router)
 app.include_router(notifications_router)
+app.include_router(login_history_router)
+app.include_router(ai_router)
+app.include_router(alerts_router)
+app.include_router(risk_router)
+app.include_router(websocket_router)
 
 start_price_worker_once()
+start_alert_worker_once()
 
 @app.get("/")
 def home():

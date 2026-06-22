@@ -166,7 +166,8 @@ function SupportManagementAdmin() {
                 </div>
                 <button 
                   onClick={() => { setSelectedChatUser(u); setIsChatModalOpen(true); }} 
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-accent text-white hover:opacity-90 transition"
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg hover:opacity-90 transition"
+                  style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
                 >
                   Reply
                 </button>

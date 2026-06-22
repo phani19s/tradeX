@@ -1,11 +1,14 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
 import { getAuthHeaders } from "../api/authApi";
+import ConfirmDialog from "./ConfirmDialog";
 
 function NotificationCenter({ isOpen, onClose }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const modalRef = useRef(null);
   const navigate = useNavigate();
 
@@ -25,6 +28,19 @@ function NotificationCenter({ isOpen, onClose }) {
     if (isOpen) {
       fetchNotifications();
     }
+  }, [isOpen]);
+
+  useEffect(() => {
+    function handleNotificationUpdate() {
+      if (isOpen) {
+        fetchNotifications();
+      }
+    }
+
+    window.addEventListener("tradex_notifications_updated", handleNotificationUpdate);
+    return () => {
+      window.removeEventListener("tradex_notifications_updated", handleNotificationUpdate);
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -52,6 +68,15 @@ function NotificationCenter({ isOpen, onClose }) {
 
   async function deleteNotification(id, e) {
     e.stopPropagation();
+    setConfirmDialog({
+      title: "Delete notification?",
+      message: "This notification will be removed from your list.",
+      confirmText: "Delete",
+      action: () => deleteNotificationConfirmed(id),
+    });
+  }
+
+  async function deleteNotificationConfirmed(id) {
     try {
       await api.delete(`/notifications/${id}`, getAuthHeaders());
       setNotifications(notifications.filter(n => n.id !== id));
@@ -61,6 +86,15 @@ function NotificationCenter({ isOpen, onClose }) {
   }
 
   async function clearAllNotifications() {
+    setConfirmDialog({
+      title: "Clear all notifications?",
+      message: "This will delete every notification in the current list.",
+      confirmText: "Clear All",
+      action: clearAllNotificationsConfirmed,
+    });
+  }
+
+  async function clearAllNotificationsConfirmed() {
     try {
       await api.delete("/notifications", getAuthHeaders());
       setNotifications([]);
@@ -79,6 +113,10 @@ function NotificationCenter({ isOpen, onClose }) {
   }
 
   const handleNotificationClick = async (notif) => {
+    if (!notif.is_read) {
+      await markAsRead(notif.id);
+    }
+
     // Redirection logic based on type
     if (notif.type === "CHAT") {
       navigate("/profile");
@@ -88,7 +126,11 @@ function NotificationCenter({ isOpen, onClose }) {
       }, 100);
     } else if (notif.type === "TICKET") {
       navigate("/profile/tickets");
-    } else if (notif.type === "DEPOSIT" || notif.type === "WITHDRAWAL" || notif.type === "TRADE") {
+    } else if (notif.type === "DEPOSIT") {
+      navigate("/dashboard#deposits");
+    } else if (notif.type === "WITHDRAWAL") {
+      navigate("/dashboard#withdrawals");
+    } else if (notif.type === "TRADE") {
       navigate("/history");
     } else {
       navigate("/dashboard");
@@ -170,6 +212,18 @@ function NotificationCenter({ isOpen, onClose }) {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        isOpen={Boolean(confirmDialog)}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message}
+        confirmText={confirmDialog?.confirmText}
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={() => {
+          const action = confirmDialog?.action;
+          setConfirmDialog(null);
+          if (action) action();
+        }}
+      />
     </div>
   );
 }

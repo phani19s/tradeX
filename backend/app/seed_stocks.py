@@ -16,8 +16,13 @@ STOCKS = [
     {"symbol": "BABA", "company_name": "Alibaba", "current_price": 82.0},
     {"symbol": "ORCL", "company_name": "Oracle", "current_price": 142.0},
     {"symbol": "JPM", "company_name": "JPMorgan Chase", "current_price": 208.0},
+    {"symbol": "INFY", "company_name": "Infosys", "current_price": 1800.0},
     {"symbol": "TCS", "company_name": "Tata Consultancy Services", "current_price": 4120.0},
     {"symbol": "RELIANCE", "company_name": "Reliance Industries", "current_price": 2985.0},
+    {"symbol": "HDFCBANK", "company_name": "HDFC Bank", "current_price": 1500.0},
+    {"symbol": "WIPRO", "company_name": "Wipro", "current_price": 540.0},
+    {"symbol": "SBIN", "company_name": "State Bank of India", "current_price": 820.0},
+    {"symbol": "SUNPHARMA", "company_name": "Sun Pharmaceutical", "current_price": 1520.0},
 ]
 
 

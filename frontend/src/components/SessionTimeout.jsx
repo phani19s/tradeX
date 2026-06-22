@@ -1,11 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { getProfile, logoutCurrentSession } from "../api/authApi";
 
 function SessionTimeout({ timeoutMinutes = 15 }) {
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [expiryMessage, setExpiryMessage] = useState("Your session has expired due to inactivity.");
   const navigate = useNavigate();
   const timerRef = useRef(null);
+
+  const clearSessionAndGoToLogin = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("tradex_last_activity");
+    localStorage.removeItem("tradex_stay_login_timestamp");
+    localStorage.setItem("tradex_session_status", `logged_out_${Date.now()}`);
+    setIsTimedOut(false);
+    navigate("/");
+  }, [navigate]);
 
   const logout = useCallback((message = "Your session has expired due to inactivity.") => {
     // Check if we recently clicked "Stay Login" to avoid redundant prompts (especially from 401 loops)
@@ -30,15 +41,26 @@ function SessionTimeout({ timeoutMinutes = 15 }) {
     }
   }, [logout, timeoutMinutes]);
 
-  const stayLogin = useCallback(() => {
-    setIsTimedOut(false);
-    resetTimer();
-    // Update last activity and session status to sync other tabs
-    const now = Date.now().toString();
-    localStorage.setItem("tradex_stay_login_timestamp", now);
-    localStorage.setItem("tradex_last_activity", now);
-    localStorage.setItem("tradex_session_status", "stay_" + now);
-  }, [resetTimer]);
+  const stayLogin = useCallback(async () => {
+    try {
+      const response = await getProfile();
+      localStorage.setItem("user", JSON.stringify(response.data));
+
+      setIsTimedOut(false);
+      resetTimer();
+      // Update last activity and session status to sync other tabs
+      const now = Date.now().toString();
+      localStorage.setItem("tradex_stay_login_timestamp", now);
+      localStorage.setItem("tradex_last_activity", now);
+      localStorage.setItem("tradex_session_status", "stay_" + now);
+    } catch (error) {
+      if (error.response?.status !== 401) {
+        console.error("Failed to restore session", error);
+      }
+
+      clearSessionAndGoToLogin();
+    }
+  }, [clearSessionAndGoToLogin, resetTimer]);
 
   useEffect(() => {
     const handleStorageChange = (e) => {
@@ -50,6 +72,9 @@ function SessionTimeout({ timeoutMinutes = 15 }) {
             if (Date.now() - lastStay < 15 * 60 * 1000) return;
             
             setIsTimedOut(true);
+          } else if (e.newValue.startsWith("logged_out_")) {
+            setIsTimedOut(false);
+            navigate("/");
           } else if (e.newValue.startsWith("stay_")) {
             setIsTimedOut(false);
             resetTimer();
@@ -63,7 +88,7 @@ function SessionTimeout({ timeoutMinutes = 15 }) {
     window.addEventListener("storage", handleStorageChange);
     
     const handleAuthError = () => {
-      logout("Your security session has expired or is invalid.");
+      clearSessionAndGoToLogin();
     };
 
     window.addEventListener("tradex_auth_expired", handleAuthError);
@@ -101,13 +126,20 @@ function SessionTimeout({ timeoutMinutes = 15 }) {
       events.forEach((event) => window.removeEventListener(event, handleActivity));
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [resetTimer, isTimedOut, logout]);
+  }, [navigate, resetTimer, isTimedOut, logout, clearSessionAndGoToLogin]);
 
-  const handleRelogin = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setIsTimedOut(false);
-    navigate("/");
+  const handleRelogin = async () => {
+    try {
+      if (localStorage.getItem("token")) {
+        await logoutCurrentSession();
+      }
+    } catch (error) {
+      if (error.response?.status !== 401) {
+        console.error("Failed to close current session", error);
+      }
+    } finally {
+      clearSessionAndGoToLogin();
+    }
   };
 
   if (!isTimedOut) return null;

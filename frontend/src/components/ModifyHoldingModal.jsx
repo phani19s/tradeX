@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useCallback, useEffect, useState } from "react";
 import api from "../api/api";
 import { getAuthHeaders } from "../api/authApi";
+import ConfirmDialog from "./ConfirmDialog";
 
 function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
   const [slPrice, setSlPrice] = useState("");
@@ -9,28 +11,30 @@ function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
   const [existingOrders, setExistingOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [targetToDelete, setTargetToDelete] = useState(null);
+  const [editingTarget, setEditingTarget] = useState(null);
 
-  useEffect(() => {
-    if (holding) {
-      setQuantity(holding.quantity.toString());
-      fetchExistingSLTP();
-    }
-  }, [holding]);
+  const fetchExistingSLTP = useCallback(async () => {
+    if (!holding) return;
 
-  async function fetchExistingSLTP() {
     try {
       const response = await api.get("/trade/sl-tp", getAuthHeaders());
-      const filtered = response.data.filter(o => o.symbol === holding.symbol);
+      const filtered = response.data.filter((o) => o.symbol === holding.symbol);
       setExistingOrders(filtered);
-      
-      if (filtered.length > 0) {
-        // Set the form with the first one as default if needed, 
-        // but maybe better to keep it empty for new targets
+
+      const assignedQuantity = filtered.reduce((sum, order) => sum + order.quantity, 0);
+      const availableQuantity = Math.max((holding?.quantity || 0) - assignedQuantity, 0);
+      if (!editingTarget) {
+        setQuantity(availableQuantity > 0 ? availableQuantity.toString() : "");
       }
     } catch (err) {
       console.error("Failed to fetch existing SL/TP", err);
     }
-  }
+  }, [editingTarget, holding]);
+
+  useEffect(() => {
+    fetchExistingSLTP();
+  }, [fetchExistingSLTP]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -38,21 +42,49 @@ function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
     setError("");
 
     try {
-      const stocksRes = await api.get("/stocks/", getAuthHeaders());
-      const stock = stocksRes.data.find(s => s.symbol === holding.symbol);
+      const requestedQuantity = parseInt(quantity);
 
-      await api.post("/trade/sl-tp", {
-        stock_id: stock.id,
-        sl_price: slPrice ? parseFloat(slPrice) : null,
-        tp_price: tpPrice ? parseFloat(tpPrice) : null,
-        quantity: parseInt(quantity)
-      }, getAuthHeaders());
+      if (!requestedQuantity || requestedQuantity > maxSellQuantity) {
+        setError("Not available stocks");
+        setLoading(false);
+        return;
+      }
+
+      if (editingTarget) {
+        await api.patch(
+          `/trade/sl-tp/${editingTarget.id}`,
+          null,
+          {
+            ...getAuthHeaders(),
+            params: {
+              sl_price: slPrice ? parseFloat(slPrice) : undefined,
+              tp_price: tpPrice ? parseFloat(tpPrice) : undefined,
+              new_quantity: requestedQuantity,
+            },
+          }
+        );
+      } else {
+        const stocksRes = await api.get("/stocks/", getAuthHeaders());
+        const stock = stocksRes.data.find((s) => s.symbol === holding.symbol);
+
+        await api.post(
+          "/trade/sl-tp",
+          {
+            stock_id: stock.id,
+            sl_price: slPrice ? parseFloat(slPrice) : null,
+            tp_price: tpPrice ? parseFloat(tpPrice) : null,
+            quantity: requestedQuantity,
+          },
+          getAuthHeaders()
+        );
+      }
 
       setSlPrice("");
       setTpPrice("");
+      setEditingTarget(null);
       fetchExistingSLTP();
       onUpdate();
-      // Don't close immediately so they can add more targets if they want
+      // Don't close immediately so they can add more targets if they want.
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to set SL/TP");
     } finally {
@@ -60,131 +92,240 @@ function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
     }
   }
 
+  async function handleDeleteTarget(orderId) {
+    setLoading(true);
+    setError("");
+
+    try {
+      await api.delete(`/trade/sl-tp/${orderId}`, getAuthHeaders());
+      fetchExistingSLTP();
+      onUpdate();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Failed to delete target");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleEditTarget(order) {
+    setEditingTarget(order);
+    setSlPrice(order.sl_price ? String(order.sl_price) : "");
+    setTpPrice(order.tp_price ? String(order.tp_price) : "");
+    setQuantity(String(order.quantity));
+    setError("");
+  }
+
+  function cancelEditTarget() {
+    setEditingTarget(null);
+    setSlPrice("");
+    setTpPrice("");
+    const availableQuantity = Math.max((holding?.quantity || 0) - totalAssignedQuantity, 0);
+    setQuantity(availableQuantity > 0 ? availableQuantity.toString() : "");
+  }
+
   const totalAssignedQuantity = existingOrders.reduce((sum, o) => sum + o.quantity, 0);
-  const remainingVolume = holding ? holding.quantity - totalAssignedQuantity : 0;
+  const remainingVolume = holding ? Math.max(holding.quantity - totalAssignedQuantity, 0) : 0;
+  const maxSellQuantity = editingTarget ? remainingVolume + editingTarget.quantity : remainingVolume;
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div 
-        className="w-full max-w-md my-8 rounded-[32px] border p-8 shadow-2xl"
+    <div className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm sm:items-center">
+      <div
+        className="my-4 flex max-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-[28px] border shadow-2xl sm:my-8"
         style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }}
       >
-        <div className="flex items-center justify-between mb-6">
+        <div
+          className="flex shrink-0 items-center justify-between gap-4 border-b p-5"
+          style={{ borderColor: "var(--border)", background: "var(--card)" }}
+        >
           <h2 className="text-2xl font-black">Modify Holding</h2>
-          <button onClick={onClose} className="opacity-50 hover:opacity-100">✕</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-lg font-black opacity-70 transition hover:opacity-100"
+            style={{ borderColor: "var(--border)" }}
+            aria-label="Close modify holding"
+          >
+            x
+          </button>
         </div>
 
-        <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10">
-          <div className="flex justify-between text-sm mb-1">
-            <span className="opacity-60">Stock</span>
-            <span className="font-bold">{holding.symbol}</span>
-          </div>
-          <div className="flex justify-between text-sm mb-1">
-            <span className="opacity-60">Buy Price</span>
-            <span className="font-bold text-accent">₹{holding.buy_price}</span>
-          </div>
-          <div className="flex justify-between text-sm mb-1">
-            <span className="opacity-60">Current Price</span>
-            <span className="font-bold">₹{holding.current_price}</span>
-          </div>
-          <div className="flex justify-between text-sm mb-1">
-            <span className="opacity-60">Owned Quantity</span>
-            <span className="font-bold">{holding.quantity}</span>
-          </div>
-          <div className="flex justify-between text-sm pt-2 mt-2 border-t border-white/10">
-            <span className="font-bold opacity-80">Remaining Volume</span>
-            <span className={`font-black ${remainingVolume > 0 ? "text-emerald-500" : "text-rose-500"}`}>
-              {remainingVolume}
-            </span>
-          </div>
-        </div>
-
-        {existingOrders.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-xs font-bold uppercase tracking-wider opacity-60 mb-3 ml-1">
-              Active Targets
-            </h3>
-            <div className="space-y-2">
-              {existingOrders.map((order, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-accent/5 border border-accent/10 text-xs">
-                  <div>
-                    <span className="font-bold">{order.quantity} shares</span>
-                    {order.sl_price && <span className="ml-2 text-rose-500">SL: ₹{order.sl_price}</span>}
-                    {order.tp_price && <span className="ml-2 text-emerald-500">TP: ₹{order.tp_price}</span>}
-                  </div>
-                </div>
-              ))}
+        <div className="overflow-y-auto p-5 sm:p-6">
+          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="mb-1 flex justify-between text-sm">
+              <span className="opacity-60">Stock</span>
+              <span className="font-bold">{holding.symbol}</span>
+            </div>
+            <div className="mb-1 flex justify-between text-sm">
+              <span className="opacity-60">Buy Price</span>
+              <span className="font-bold text-accent">Rs. {holding.buy_price}</span>
+            </div>
+            <div className="mb-1 flex justify-between text-sm">
+              <span className="opacity-60">Current Price</span>
+              <span className="font-bold">Rs. {holding.current_price}</span>
+            </div>
+            <div className="mb-1 flex justify-between text-sm">
+              <span className="opacity-60">Owned Quantity</span>
+              <span className="font-bold">{holding.quantity}</span>
+            </div>
+            <div className="mt-2 flex justify-between border-t border-white/10 pt-2 text-sm">
+              <span className="font-bold opacity-80">Remaining Volume</span>
+              <span className={`font-black ${remainingVolume > 0 ? "text-emerald-500" : "text-slate-500"}`}>
+                {remainingVolume}
+              </span>
             </div>
           </div>
-        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider opacity-60 ml-1">
-            Add New Target
-          </h3>
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider opacity-60 mb-2 ml-1">
-              Stop Loss (SL) Price
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={slPrice}
-              onChange={(e) => setSlPrice(e.target.value)}
-              placeholder="Sell if price drops below..."
-              className="w-full rounded-2xl border bg-transparent p-4 outline-none focus:border-red-500/50 transition"
-              style={{ borderColor: "var(--border)" }}
-            />
-          </div>
+          {existingOrders.length > 0 && (
+            <div className="mb-6">
+              <h3 className="mb-3 ml-1 text-xs font-bold uppercase tracking-wider opacity-60">
+                Active Targets
+              </h3>
+              <div className="space-y-2">
+                {existingOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-accent/10 bg-accent/5 p-3 text-xs"
+                  >
+                    <div>
+                      <span className="font-bold">{order.quantity} shares</span>
+                      {order.sl_price && <span className="ml-2 text-rose-500">SL: Rs. {order.sl_price}</span>}
+                      {order.tp_price && <span className="ml-2 text-emerald-500">TP: Rs. {order.tp_price}</span>}
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleEditTarget(order)}
+                        disabled={loading}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-400 text-emerald-500 transition hover:bg-emerald-500 hover:text-white disabled:opacity-50"
+                        title="Edit target"
+                        aria-label="Edit target"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargetToDelete(order.id)}
+                        disabled={loading}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-400 text-red-500 transition hover:bg-red-500 hover:text-white disabled:opacity-50"
+                        title="Delete target"
+                        aria-label="Delete target"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v5" />
+                          <path d="M14 11v5" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider opacity-60 mb-2 ml-1">
-              Take Profit (TP) Price
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={tpPrice}
-              onChange={(e) => setTpPrice(e.target.value)}
-              placeholder="Sell if price rises above..."
-              className="w-full rounded-2xl border bg-transparent p-4 outline-none focus:border-green-500/50 transition"
-              style={{ borderColor: "var(--border)" }}
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <h3 className="ml-1 text-xs font-bold uppercase tracking-wider opacity-60">
+              {editingTarget ? "Edit Target" : "Add New Target"}
+            </h3>
+            <div>
+              <label className="mb-2 ml-1 block text-xs font-bold uppercase tracking-wider opacity-60">
+                Stop Loss (SL) Price
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={slPrice}
+                onChange={(e) => setSlPrice(e.target.value)}
+                placeholder="Sell if price drops below..."
+                className="w-full rounded-2xl border bg-transparent p-4 outline-none transition focus:border-red-500/50"
+                style={{ borderColor: "var(--border)" }}
+              />
+            </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider opacity-60 mb-2 ml-1">
-              Quantity to Sell
-            </label>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              max={holding.quantity}
-              min="1"
-              required
-              className="w-full rounded-2xl border bg-transparent p-4 outline-none transition"
-              style={{ borderColor: "var(--border)" }}
-            />
-            <p className="text-[10px] opacity-40 mt-2 ml-1 italic">
-              *SL/TP will execute for this quantity when triggered.
-            </p>
-          </div>
+            <div>
+              <label className="mb-2 ml-1 block text-xs font-bold uppercase tracking-wider opacity-60">
+                Take Profit (TP) Price
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={tpPrice}
+                onChange={(e) => setTpPrice(e.target.value)}
+                placeholder="Sell if price rises above..."
+                className="w-full rounded-2xl border bg-transparent p-4 outline-none transition focus:border-green-500/50"
+                style={{ borderColor: "var(--border)" }}
+              />
+            </div>
 
-          {error && <p className="text-red-500 text-sm font-medium text-center">{error}</p>}
+            <div>
+              <label className="mb-2 ml-1 block text-xs font-bold uppercase tracking-wider opacity-60">
+                Quantity to Sell
+              </label>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                max={maxSellQuantity}
+                min="1"
+                required
+                className="w-full rounded-2xl border bg-transparent p-4 outline-none transition"
+                style={{ borderColor: "var(--border)" }}
+              />
+              <p className="ml-1 mt-2 text-[10px] italic opacity-40">
+                *SL/TP will execute for this quantity when triggered.
+              </p>
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-2xl py-4 font-bold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: "var(--accent)" }}
-          >
-            {loading ? "Updating..." : "Save Conditions"}
-          </button>
-        </form>
+            {error && <p className="text-center text-sm font-medium text-red-500">{error}</p>}
+
+            <div className="flex gap-3">
+              {editingTarget && (
+                <button
+                  type="button"
+                  onClick={cancelEditTarget}
+                  className="flex-1 rounded-2xl border py-4 font-bold transition hover:opacity-80"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={loading || maxSellQuantity <= 0}
+                className="flex-1 rounded-2xl py-4 font-bold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: "var(--accent)" }}
+              >
+                {loading ? "Updating..." : editingTarget ? "Update Target" : "Save Conditions"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
+      <ConfirmDialog
+        isOpen={Boolean(targetToDelete)}
+        title="Delete target?"
+        message="This SL/TP target will be removed and will no longer execute automatically."
+        confirmText="Delete Target"
+        onCancel={() => setTargetToDelete(null)}
+        onConfirm={() => {
+          const orderId = targetToDelete;
+          setTargetToDelete(null);
+          handleDeleteTarget(orderId);
+        }}
+      />
     </div>
   );
 }

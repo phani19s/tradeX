@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../api/api";
 import { getAuthHeaders } from "../api/authApi";
 import Navbar from "../components/Navbar";
+import { useStocks } from "../context/StockContext";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("en-IN", {
@@ -11,9 +12,95 @@ function formatMoney(value) {
   }).format(Number(value || 0));
 }
 
+function getTriggerInfo(note) {
+  const safeNote = note || "";
+  const priceMatch = safeNote.match(/(?:Trigger:\s*(?:₹|Rs\.?\s*)?)([\d.]+)/i);
+  const triggerPrice = priceMatch ? Number(priceMatch[1]) : null;
+
+  if (/stop loss/i.test(safeNote)) {
+    return { type: "Stop Loss Triggered Sale", triggerPrice };
+  }
+
+  if (/take profit/i.test(safeNote)) {
+    return { type: "Take Profit Triggered Sale", triggerPrice };
+  }
+
+  if (/limit buy/i.test(safeNote)) {
+    return { type: "Auto Buy Executed", triggerPrice };
+  }
+
+  return null;
+}
+
+function getTradeDetailItems(trade) {
+  const quantity = Number(trade.quantity || 0);
+  const buyPrice = Number(trade.buy_price ?? trade.price ?? 0);
+  const sellPrice = Number(trade.price || 0);
+  const buyAmount = quantity * buyPrice;
+  const sellAmount = quantity * sellPrice;
+  const profit = sellAmount - buyAmount;
+  const triggerInfo = getTriggerInfo(trade.note);
+
+  if (trade.trade_type === "LIMIT BUY") {
+    return [
+      { label: "Buy Type", value: "Limit Buy" },
+      { label: "Quantity", value: quantity },
+      { label: "Set Buy Price", value: `Rs. ${formatMoney(buyPrice)}` },
+      { label: "Buy Amount", value: `Rs. ${formatMoney(buyAmount)}` },
+      { label: "Current Stock Price", value: `Rs. ${formatMoney(trade.current_price)}` },
+    ];
+  }
+
+  if (trade.trade_type === "SELL") {
+    return [
+      { label: "Sale Type", value: triggerInfo?.type || "Manual Sale" },
+      { label: "Quantity", value: quantity },
+      { label: "Buy Price", value: `Rs. ${formatMoney(buyPrice)}` },
+      ...(triggerInfo?.triggerPrice
+        ? [{ label: "Set Trigger Price", value: `Rs. ${formatMoney(triggerInfo.triggerPrice)}` }]
+        : []),
+      { label: triggerInfo ? "Triggered Sold Price" : "Sell Price", value: `Rs. ${formatMoney(sellPrice)}` },
+      { label: "Buy Amount", value: `Rs. ${formatMoney(buyAmount)}` },
+      { label: "Sell Amount", value: `Rs. ${formatMoney(sellAmount)}` },
+      {
+        label: profit >= 0 ? "Sale Profit" : "Sale Loss",
+        value: `${profit >= 0 ? "+" : "-"}Rs. ${formatMoney(Math.abs(profit))}`,
+        tone: profit >= 0 ? "profit" : "loss",
+      },
+    ];
+  }
+
+  if (triggerInfo) {
+    const setBuyPrice = triggerInfo.triggerPrice ?? buyPrice;
+
+    return [
+      { label: "Buy Type", value: triggerInfo.type },
+      { label: "Quantity", value: quantity },
+      { label: "Set Buy Price", value: `Rs. ${formatMoney(setBuyPrice)}` },
+      { label: "Triggered Buy Price", value: `Rs. ${formatMoney(buyPrice)}` },
+      { label: "Buy Amount", value: `Rs. ${formatMoney(quantity * buyPrice)}` },
+    ];
+  }
+
+  return [
+    { label: "Buy Type", value: "Manual Buy" },
+    { label: "Quantity", value: quantity },
+    { label: "Buy Price", value: `Rs. ${formatMoney(buyPrice)}` },
+    { label: "Buy Amount", value: `Rs. ${formatMoney(buyAmount)}` },
+  ];
+}
+
+function getDetailTitle(tradeType) {
+  if (tradeType === "LIMIT BUY") return "Limit Buy Details";
+  if (tradeType === "SELL") return "Sale Details";
+  return "Buy Details";
+}
+
 function History() {
   const [trades, setTrades] = useState([]);
   const [targets, setTargets] = useState([]);
+  const [selectedTrade, setSelectedTrade] = useState(null);
+  const { stocks } = useStocks();
 
   async function fetchTrades() {
     try {
@@ -53,18 +140,25 @@ function History() {
   const allActivity = useMemo(() => {
     const limitOrders = targets
       .filter((o) => o.buy_price !== null)
-      .map((o) => ({
-        stock_symbol: o.symbol,
-        company_name: "Limit Buy Order",
-        trade_type: "LIMIT BUY",
-        quantity: o.quantity,
-        price: o.buy_price,
-        note: "Pending Execution",
-        isPending: true,
-      }));
+      .map((o) => {
+        const stock = stocks.find((item) => item.symbol === o.symbol);
+
+        return {
+          id: `limit-${o.id}`,
+          stock_symbol: o.symbol,
+          company_name: stock?.company_name || "Limit Buy Order",
+          trade_type: "LIMIT BUY",
+          quantity: o.quantity,
+          price: o.buy_price,
+          buy_price: o.buy_price,
+          current_price: stock?.current_price ?? o.buy_price,
+          note: "Pending Execution",
+          isPending: true,
+        };
+      });
 
     return [...limitOrders, ...trades];
-  }, [trades, targets]);
+  }, [stocks, trades, targets]);
 
   return (
     <div className="page-bg">
@@ -136,12 +230,13 @@ function History() {
                   <th className="px-4 py-4 text-left text-sm">Quantity</th>
                   <th className="px-4 py-4 text-left text-sm">Price</th>
                   <th className="px-4 py-4 text-left text-sm">Status / Note</th>
+                  <th className="px-4 py-4 text-left text-sm">Details</th>
                 </tr>
               </thead>
               <tbody>
                 {allActivity.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-sm opacity-70">
+                    <td colSpan={6} className="px-4 py-10 text-center text-sm opacity-70">
                       No activity yet.
                     </td>
                   </tr>
@@ -176,6 +271,16 @@ function History() {
                           {trade.note || (trade.trade_type === "BUY" ? "Manual Purchase" : "Manual Sale")}
                         </div>
                       </td>
+                      <td className="px-4 py-4">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTrade(trade)}
+                          className="rounded-xl border px-4 py-2 text-xs font-bold transition hover:opacity-80"
+                          style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+                        >
+                          View Details
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -184,6 +289,64 @@ function History() {
           </div>
         </div>
       </div>
+      {selectedTrade && (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div
+            className="w-full max-w-lg rounded-2xl border p-6 shadow-2xl"
+            style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }}
+          >
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] opacity-60">
+                  {getDetailTitle(selectedTrade.trade_type)}
+                </p>
+                <h3 className="mt-2 text-3xl font-black">{selectedTrade.stock_symbol}</h3>
+                <p className="mt-1 text-sm opacity-70">{selectedTrade.company_name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTrade(null)}
+                className="rounded-xl border px-3 py-2 text-sm font-bold transition hover:opacity-80"
+                style={{ borderColor: "var(--border)" }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {getTradeDetailItems(selectedTrade).map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-2xl border p-4"
+                  style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-50">{item.label}</p>
+                  <p
+                    className={`mt-2 text-lg font-black ${
+                      item.tone === "profit"
+                        ? "text-emerald-500"
+                        : item.tone === "loss"
+                        ? "text-rose-500"
+                        : ""
+                    }`}
+                  >
+                    {item.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-2xl border p-4" style={{ borderColor: "var(--border)" }}>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-50">
+                {selectedTrade.isPending ? "Order Status" : "Trade Note"}
+              </p>
+              <p className="mt-2 text-sm opacity-80">
+                {selectedTrade.note || (selectedTrade.trade_type === "BUY" ? "Manual Purchase" : "Manual Sale")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

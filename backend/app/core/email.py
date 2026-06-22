@@ -402,6 +402,67 @@ def send_otp_email(receiver_email, otp):
     _send_html_email(receiver_email, "TradeX OTP Verification", body)
 
 
+def send_two_factor_otp_email(receiver_email, otp):
+    body = f"""
+    <html>
+    <body style="font-family:Arial,sans-serif;background:#f5f7fa;padding:20px;">
+      <div style="max-width:600px;margin:auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 12px rgba(0,0,0,.1);">
+        <h1 style="color:#2563eb;text-align:center;">TradeX</h1>
+        <h2 style="text-align:center;">Two-Factor Authentication</h2>
+        <p>You are enabling or signing in with Email OTP 2FA on your TradeX account.</p>
+        <p>Your 2FA verification code is:</p>
+        <div style="font-size:32px;font-weight:bold;text-align:center;letter-spacing:6px;padding:20px;background:#eff6ff;border-radius:8px;color:#2563eb;">
+          {otp}
+        </div>
+        <p style="margin-top:20px;">This OTP will expire in 5 minutes.</p>
+        <p>If you did not request this code, please secure your account immediately.</p>
+        <hr>
+        <p style="text-align:center;color:#666;">TradeX Team</p>
+      </div>
+    </body>
+    </html>
+    """
+
+    _send_html_email(receiver_email, "TradeX 2FA Verification Code", body)
+
+
+def send_password_reset_otp_email(receiver_email, otp, reset_link=None):
+    reset_link_html = (
+        f"""
+        <p style="margin-top:24px;">You can also open the secure reset page directly:</p>
+        <p style="text-align:center;margin:24px 0;">
+          <a href="{reset_link}" style="display:inline-block;background:#2563eb;color:white;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:bold;">
+            Reset Password
+          </a>
+        </p>
+        """
+        if reset_link
+        else ""
+    )
+
+    body = f"""
+    <html>
+    <body style="font-family:Arial,sans-serif;background:#f5f7fa;padding:20px;">
+      <div style="max-width:600px;margin:auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 12px rgba(0,0,0,.1);">
+        <h1 style="color:#2563eb;text-align:center;">TradeX</h1>
+        <h2 style="text-align:center;">Password Reset</h2>
+        <p>Use this verification code to reset your TradeX password.</p>
+        <div style="font-size:32px;font-weight:bold;text-align:center;letter-spacing:6px;padding:20px;background:#eff6ff;border-radius:8px;color:#2563eb;">
+          {otp}
+        </div>
+        {reset_link_html}
+        <p style="margin-top:20px;">This OTP will expire in 5 minutes.</p>
+        <p>If you did not request this email, please ignore it.</p>
+        <hr>
+        <p style="text-align:center;color:#666;">TradeX Team</p>
+      </div>
+    </body>
+    </html>
+    """
+
+    _send_html_email(receiver_email, "TradeX Password Reset Code", body)
+
+
 def send_deposit_request_email(
     user_email: str,
     amount: float,
@@ -843,3 +904,36 @@ def send_chat_message_to_user(user_email: str, message: str):
     </html>
     """
     _send_html_email(user_email, subject, html, reply_to=APPROVAL_EMAIL)
+
+
+def send_price_alert_email(
+    recipient_email: str,
+    username: str,
+    symbol: str,
+    current_price: float,
+    condition: str
+):
+    subject = "TradeX Price Alert"
+    html = f"""
+    <html>
+    <body style="font-family:Arial;background:#f4f6f9;padding:20px;">
+    <div style="max-width:600px;margin:auto;background:white;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+    <div style="background:#ef4444;color:white;padding:20px;text-align:center;">
+        <h1>Price Alert Triggered</h1>
+    </div>
+    <div style="padding:25px;">
+        <h2 style="color:#0f172a;">Hello {username},</h2>
+        <p style="font-size:16px;color:#475569;">Your TradeX price alert has been triggered.</p>
+        <div style="background:#fef2f2;border:1px solid #fecaca;padding:20px;border-radius:12px;margin-top:15px;">
+            <p style="margin:8px 0;color:#0f172a;"><strong>Stock:</strong> {symbol}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Alert:</strong> {condition}</p>
+            <p style="margin:8px 0;color:#0f172a;"><strong>Current Price:</strong> Rs. {current_price}</p>
+        </div>
+        <p style="margin-top:20px;">Open TradeX to review the stock before taking action.</p>
+        <p style="text-align:center;color:#64748b;font-size:14px;margin-top:20px;">TradeX Team</p>
+    </div>
+    </div>
+    </body>
+    </html>
+    """
+    _send_html_email(recipient_email, subject, html)

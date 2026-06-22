@@ -158,7 +158,7 @@ function AdminPanel() {
       <div className="theme-main p-5">
         <div className="theme-card rounded-2xl p-6 shadow mb-6">
           <h1 className="text-4xl font-bold">Admin Panel</h1>
-          <p className="mt-2 text-gray-500">
+          <p className="mt-2 opacity-70">
             Admin can credit any account directly and verify pending deposit requests.
           </p>
         </div>
@@ -204,8 +204,8 @@ function AdminPanel() {
             <button
               type="button"
               onClick={handleAdminCredit}
-              className="rounded-xl px-5 py-3 font-semibold text-white hover:opacity-90"
-              style={{ backgroundColor: "var(--accent)" }}
+              className="rounded-xl px-5 py-3 font-semibold hover:opacity-90"
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-contrast)" }}
             >
               Add Money
             </button>

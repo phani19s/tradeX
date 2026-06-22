@@ -34,6 +34,21 @@ function getAccentColor(accent) {
   return ACCENT_COLORS[accent] || ACCENT_COLORS.green;
 }
 
+function getAccentContrastColor(hex) {
+  const normalized = String(hex || "").replace("#", "");
+
+  if (normalized.length !== 6) {
+    return "#ffffff";
+  }
+
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  const brightness = (red * 299 + green * 587 + blue * 114) / 1000;
+
+  return brightness > 160 ? "#0f172a" : "#ffffff";
+}
+
 function createDefaultTimeConfigs() {
   return {
     Morning: { mode: "light", accent: "yellow" },
@@ -221,6 +236,10 @@ export function ThemeProvider({ children }) {
       document.documentElement.style.setProperty("--accent", accentColor);
       document.documentElement.style.setProperty("--accent-soft", `${accentColor}26`);
       document.documentElement.style.setProperty("--accent-border", `${accentColor}66`);
+      document.documentElement.style.setProperty(
+        "--accent-contrast",
+        getAccentContrastColor(accentColor)
+      );
     };
 
     syncTheme();

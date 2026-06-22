@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../api/api";
 import { getAuthHeaders } from "../api/authApi";
 
@@ -17,12 +17,8 @@ function SupportChatModal({ isOpen, onClose }) {
   }, [isOpen]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, [messages]);
 
   async function fetchMessages() {
     try {
@@ -33,9 +29,12 @@ function SupportChatModal({ isOpen, onClose }) {
     }
   }
 
-  async function handleSendMessage(e) {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
+  async function handleSendMessage(event) {
+    event.preventDefault();
+
+    if (!newMessage.trim()) {
+      return;
+    }
 
     setLoading(true);
     try {
@@ -49,20 +48,26 @@ function SupportChatModal({ isOpen, onClose }) {
     }
   }
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
-    <div className="fixed bottom-6 right-6 z-[1000] w-96 flex flex-col rounded-3xl border shadow-2xl overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)", height: "500px" }}>
-      {/* Header */}
-      <div className="p-4 border-b flex justify-between items-center" style={{ background: "var(--accent)", color: "white" }}>
+    <div
+      className="fixed bottom-6 right-6 z-[1000] w-96 flex flex-col rounded-3xl border shadow-2xl overflow-hidden"
+      style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)", height: "500px" }}
+    >
+      <div
+        className="p-4 border-b flex justify-between items-center"
+        style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+      >
         <div>
           <h3 className="font-bold text-lg">Support Chat</h3>
           <p className="text-xs opacity-80">We typically reply in a few minutes.</p>
         </div>
-        <button onClick={onClose} className="opacity-70 hover:opacity-100 transition p-2">✕</button>
+        <button onClick={onClose} className="opacity-70 hover:opacity-100 transition p-2">x</button>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ background: "var(--surface)" }}>
         {messages.length === 0 ? (
           <div className="text-center opacity-50 mt-10 text-sm">
@@ -71,21 +76,23 @@ function SupportChatModal({ isOpen, onClose }) {
         ) : (
           messages.map((msg) => {
             const isUser = msg.sender_type === "USER";
+
             return (
               <div key={msg.id} className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
-                <div 
-                  className={`max-w-[80%] rounded-2xl p-3 text-sm shadow-sm ${isUser ? "text-white" : ""}`}
-                  style={{ 
-                    background: isUser ? "var(--accent)" : "var(--card)", 
+                <div
+                  className="max-w-[80%] rounded-2xl p-3 text-sm shadow-sm"
+                  style={{
+                    background: isUser ? "var(--accent)" : "var(--card)",
+                    color: isUser ? "var(--accent-contrast)" : "var(--text)",
                     border: isUser ? "none" : "1px solid var(--border)",
                     borderBottomRightRadius: isUser ? "4px" : "16px",
-                    borderBottomLeftRadius: isUser ? "16px" : "4px"
+                    borderBottomLeftRadius: isUser ? "16px" : "4px",
                   }}
                 >
                   {msg.message}
                 </div>
                 <span className="text-[10px] opacity-40 mt-1 px-1">
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
             );
@@ -94,25 +101,24 @@ function SupportChatModal({ isOpen, onClose }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 border-t" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <input
             type="text"
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={(event) => setNewMessage(event.target.value)}
             placeholder="Type your message..."
             className="flex-1 rounded-full border px-4 py-2 text-sm bg-transparent focus:outline-none focus:ring-2 transition"
-            style={{ borderColor: "var(--border)" }}
+            style={{ borderColor: "var(--border)", color: "var(--text)" }}
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !newMessage.trim()}
-            className="rounded-full w-10 h-10 flex items-center justify-center text-white transition hover:opacity-90 disabled:opacity-50 flex-shrink-0"
-            style={{ background: "var(--accent)" }}
+            className="rounded-full w-10 h-10 flex items-center justify-center transition hover:opacity-90 disabled:opacity-50 flex-shrink-0"
+            style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
           >
-            ➤
+            {">"}
           </button>
         </form>
       </div>

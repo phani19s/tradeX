@@ -5,6 +5,7 @@ import api from "../api/api";
 
 import { getAuthHeaders } from "../api/authApi";
 import Navbar from "../components/Navbar";
+import ConfirmDialog from "../components/ConfirmDialog";
 import {useStocks} from "../context/StockContext";
 
 function formatPrice(value) {
@@ -17,6 +18,7 @@ function Watchlist() {
   const [watchlist, setWatchlist] = useState([]);
   const {stocks: stockOptions} = useStocks();
   const [stockId, setStockId] = useState("");
+  const [stockToRemove, setStockToRemove] = useState(null);
 
   async function fetchWatchlist() {
 
@@ -291,7 +293,7 @@ function Watchlist() {
                       <span className="text-sm opacity-70">Tracking active</span>
                       <button
                         type="button"
-                        onClick={() => removeStock(stock.stock_id)}
+                        onClick={() => setStockToRemove(stock.stock_id)}
                         className="rounded-xl border px-4 py-2 text-sm font-semibold transition hover:bg-red-500 hover:text-white"
                         style={{ borderColor: "var(--border)" }}
                       >
@@ -305,6 +307,18 @@ function Watchlist() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        isOpen={Boolean(stockToRemove)}
+        title="Remove stock?"
+        message="This stock will be removed from your watchlist."
+        confirmText="Remove"
+        onCancel={() => setStockToRemove(null)}
+        onConfirm={() => {
+          const stockIdValue = stockToRemove;
+          setStockToRemove(null);
+          removeStock(stockIdValue);
+        }}
+      />
     </div>
   );
 }

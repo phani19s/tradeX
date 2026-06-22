@@ -26,6 +26,9 @@ class User(Base):
     bank_name = Column(String, nullable=True)
     upi_id = Column(String, nullable=True)
     password = Column(String)
+    two_factor_enabled = Column(Boolean, default=False)
+    two_factor_method = Column(String, nullable=True)
+    two_factor_secret = Column(String, nullable=True)
     is_admin = Column(
         Boolean,
         default=False

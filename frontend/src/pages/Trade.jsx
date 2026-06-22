@@ -17,6 +17,41 @@ function formatPrice(value) {
   }).format(Number(value || 0));
 }
 
+function getChangePercent(stock) {
+  const previousClose = Number(stock.previous_close);
+  if (!previousClose) return 0;
+  return ((Number(stock.current_price) - previousClose) / previousClose) * 100;
+}
+
+function getStockAdvice(stock, marketStats) {
+  if (!stock || !marketStats) return null;
+
+  const change = getChangePercent(stock);
+  const { average, deviation } = marketStats;
+
+  if (!deviation) {
+    return { label: "Moderate", color: "text-amber-500", bg: "bg-amber-500/10" };
+  }
+
+  if (change >= average + deviation) {
+    return { label: "Too Good to Buy", color: "text-emerald-400 font-bold", bg: "bg-emerald-500/20" };
+  }
+
+  if (change >= average + deviation * 0.25) {
+    return { label: "Good to Buy", color: "text-emerald-500", bg: "bg-emerald-500/10" };
+  }
+
+  if (change <= average - deviation) {
+    return { label: "Too Risky", color: "text-rose-400 font-bold", bg: "bg-rose-500/20" };
+  }
+
+  if (change <= average - deviation * 0.25) {
+    return { label: "Risky", color: "text-rose-500", bg: "bg-rose-500/10" };
+  }
+
+  return { label: "Moderate", color: "text-amber-500", bg: "bg-amber-500/10" };
+}
+
 function Trade() {
   // const [stocks, setStocks] = useState([]);
   const {stocks: stockOptions} = useStocks();
@@ -90,15 +125,23 @@ function Trade() {
   const ownedQuantity = selectedHolding ? selectedHolding.quantity : 0;
   const profitLoss = selectedHolding ? selectedHolding.profit_loss : 0;
 
-  const stockAdvice = useMemo(() => {
-    if (!selectedStockData) return null;
-    const change = ((selectedStockData.current_price - selectedStockData.previous_close) / selectedStockData.previous_close) * 100;
-    if (change > 20) return { label: "Too Good to Buy", color: "text-emerald-400 font-bold", bg: "bg-emerald-500/20" };
-    if (change > 10) return { label: "Good to Buy", color: "text-emerald-500", bg: "bg-emerald-500/10" };
-    if (change < -20) return { label: "Too Risky", color: "text-rose-400 font-bold", bg: "bg-rose-500/20" };
-    if (change < -10) return { label: "Risky", color: "text-rose-500", bg: "bg-rose-500/10" };
-    return { label: "Moderate", color: "text-amber-500", bg: "bg-amber-500/10" };
-  }, [selectedStockData]);
+  const marketStats = useMemo(() => {
+    if (stockOptions.length === 0) return null;
+
+    const changes = stockOptions.map(getChangePercent);
+    const average = changes.reduce((sum, change) => sum + change, 0) / changes.length;
+    const variance = changes.reduce((sum, change) => sum + ((change - average) ** 2), 0) / changes.length;
+
+    return {
+      average,
+      deviation: Math.sqrt(variance),
+    };
+  }, [stockOptions]);
+
+  const stockAdvice = useMemo(
+    () => getStockAdvice(selectedStockData, marketStats),
+    [selectedStockData, marketStats]
+  );
 
   const canTrade = Boolean(selectedStock) && Number(quantity) > 0;
 
@@ -422,7 +465,12 @@ function Trade() {
                             <button
                               onClick={setLimitBuy}
                               disabled={!selectedStock || !limitPrice || !quantity || loading}
-                              className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg bg-accent text-white hover:opacity-90 disabled:opacity-50 transition"
+                              className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg hover:opacity-90 disabled:opacity-50 transition"
+                              style={{
+                                background: "var(--accent)",
+                                color: "var(--button-text)",
+                                border: "1px solid var(--accent-border)"
+                              }}
                             >
                               SET AUTO-BUY
                             </button>

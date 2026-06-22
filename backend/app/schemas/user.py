@@ -18,6 +18,8 @@ class UserResponse(BaseModel):
     ifsc_code: str | None = None
     bank_name: str | None = None
     upi_id: str | None = None
+    two_factor_enabled: bool = False
+    two_factor_method: str | None = None
     is_admin: bool = False
 
     class Config:

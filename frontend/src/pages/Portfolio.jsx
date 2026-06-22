@@ -6,6 +6,7 @@ import { getAuthHeaders } from "../api/authApi";
 import Navbar from "../components/Navbar";
 import ModifyHoldingModal from "../components/ModifyHoldingModal";
 import ModifyAutoBuyModal from "../components/ModifyAutoBuyModal";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("en-IN", {
@@ -19,6 +20,7 @@ function Portfolio() {
   const [selectedHolding, setSelectedHolding] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sltpOrders, setSltpOrders] = useState([]);
+  const [orderToCancel, setOrderToCancel] = useState(null);
 
   const [selectedAutoBuy, setSelectedAutoBuy] = useState(null);
   const [isAutoBuyModalOpen, setIsAutoBuyModalOpen] = useState(false);
@@ -51,7 +53,6 @@ function Portfolio() {
   }
 
   async function cancelOrder(orderId) {
-    if (!window.confirm("Are you sure you want to cancel this order?")) return;
     try {
       await api.delete(`/trade/sl-tp/${orderId}`, getAuthHeaders());
       fetchSLTPOrders();
@@ -312,7 +313,7 @@ function Portfolio() {
                             Modify
                           </button>
                           <button
-                            onClick={() => cancelOrder(order.id)}
+                            onClick={() => setOrderToCancel(order.id)}
                             className="rounded-xl px-4 py-2 text-xs font-bold text-rose-500 border border-rose-500/20 hover:bg-rose-500/10 transition"
                           >
                             Cancel
@@ -344,6 +345,18 @@ function Portfolio() {
         order={selectedAutoBuy}
         onUpdate={() => {
           fetchSLTPOrders();
+        }}
+      />
+      <ConfirmDialog
+        isOpen={Boolean(orderToCancel)}
+        title="Cancel order?"
+        message="This pending auto-buy order will be cancelled and will not execute."
+        confirmText="Cancel Order"
+        onCancel={() => setOrderToCancel(null)}
+        onConfirm={() => {
+          const orderId = orderToCancel;
+          setOrderToCancel(null);
+          cancelOrder(orderId);
         }}
       />
     </div>

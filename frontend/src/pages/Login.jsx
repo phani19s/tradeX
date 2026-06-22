@@ -19,6 +19,15 @@ function Login() {
 
   const [loading, setLoading] =
     useState(false);
+
+  const [requiresTwoFactor, setRequiresTwoFactor] =
+    useState(false);
+
+  const [twoFactorMethod, setTwoFactorMethod] =
+    useState("");
+
+  const [twoFactorOtp, setTwoFactorOtp] =
+    useState("");
   
   const [showPassword,
     setShowPassword] =
@@ -27,37 +36,124 @@ function Login() {
   const navigate =
     useNavigate();
 
+  const getDeviceLocation = async () => {
+    const cachedLocation = localStorage.getItem("tradex_device_location");
+    if (cachedLocation) {
+      return cachedLocation;
+    }
+
+    if (!navigator.geolocation) {
+      return "";
+    }
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          maximumAge: 10 * 60 * 1000,
+          timeout: 5000,
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      const response = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+      );
+      const data = await response.json();
+      const location = [
+        data.city || data.locality,
+        data.principalSubdivision,
+        data.countryName,
+      ].filter(Boolean).join(", ");
+
+      if (location) {
+        localStorage.setItem("tradex_device_location", location);
+      }
+
+      return location;
+    } catch {
+      return "";
+    }
+  };
+
+  const completeLogin = (data) => {
+    localStorage.setItem(
+      "token",
+      data.access_token
+    );
+
+    localStorage.setItem(
+      "user",
+      JSON.stringify(data.user)
+    );
+
+    const now = Date.now().toString();
+    localStorage.setItem(
+      "tradex_stay_login_timestamp",
+      now
+    );
+    localStorage.setItem(
+      "tradex_last_activity",
+      now
+    );
+    localStorage.setItem(
+      "tradex_session_status",
+      `stay_${now}`
+    );
+
+    toast.success(
+      "Login Successful"
+    );
+
+    navigate("/dashboard");
+  };
+
   const handleLogin =
     async () => {
 
       setLoading(true);
       try {
+        const loginUrl =
+          requiresTwoFactor
+            ? "/auth/login/2fa"
+            : "/auth/login";
+
+        const payload =
+          requiresTwoFactor
+            ? {
+                email,
+                password,
+                otp: twoFactorOtp,
+              }
+            : {
+                email,
+                password,
+              };
+
         const response =
           await api.post(
-            "/auth/login",
+            loginUrl,
+            payload,
             {
-              email,
-              password,
+              headers: {
+                "X-TradeX-Location": await getDeviceLocation(),
+              },
             }
           );
 
-        localStorage.setItem(
-          "token",
-          response.data.access_token
-        );
+        if (response.data.requires_2fa) {
+          setRequiresTwoFactor(true);
+          setTwoFactorMethod(response.data.method);
+          setTwoFactorOtp("");
+          toast.info(
+            response.data.method === "email"
+              ? "Enter the OTP sent to your email"
+              : "Enter your Google Authenticator code"
+          );
+          return;
+        }
 
-        localStorage.setItem(
-          "user",
-          JSON.stringify(response.data.user)
-        );
-
-        setLoading(false);
-
-        toast.success(
-          "Login Successful"
-        );
-
-        navigate("/dashboard");
+        completeLogin(response.data);
 
       } catch (error) {
         const message =
@@ -265,11 +361,57 @@ return (
 
         </div>
 
+        <div className="mb-4 text-right">
+          <Link
+            to="/forgot-password"
+            className="text-sm font-semibold text-blue-300 hover:text-blue-200"
+          >
+            Forgot password?
+          </Link>
+        </div>
+
+        {requiresTwoFactor && (
+          <div className="mb-4">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder={
+                twoFactorMethod === "email"
+                  ? "Email OTP"
+                  : "Google Authenticator Code"
+              }
+              value={twoFactorOtp}
+              onChange={(e) =>
+                setTwoFactorOtp(
+                  e.target.value
+                )
+              }
+              className="
+              w-full
+              bg-white/10
+              border
+              border-white/20
+              text-white
+              placeholder-gray-300
+              p-4
+              rounded-xl
+              outline-none
+              focus:border-blue-400
+            "
+            />
+            <p className="mt-2 text-sm text-blue-200">
+              {twoFactorMethod === "email"
+                ? "A one-time code was sent to your email."
+                : "Enter the 6-digit code from your authenticator app."}
+            </p>
+          </div>
+        )}
+
         {/* Login Button */}
 
         <button
           onClick={handleLogin}
-          disabled={loading}
+          disabled={loading || (requiresTwoFactor && !twoFactorOtp.trim())}
           className="
           w-full
           bg-blue-600
@@ -283,7 +425,9 @@ return (
           {
             loading
               ? "Logging In..."
-              : "Login"
+              : requiresTwoFactor
+                ? "Verify & Login"
+                : "Login"
           }
         </button>
 
