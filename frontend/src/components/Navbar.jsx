@@ -98,47 +98,68 @@ function Navbar() {
       style={{ background: "var(--card)", color: "var(--text)", borderColor: "var(--border)" }}
     >
       <div className="relative mx-auto flex max-w-7xl items-center gap-4 px-4 py-4">
-        <Link to="/dashboard" {...linkStyle("/dashboard")}>
+        <Link to={currentUser?.is_admin ? "/admin" : "/dashboard"} {...linkStyle(currentUser?.is_admin ? "/admin" : "/dashboard")}>
           Dashboard
         </Link>
 
-        <Link to="/portfolio" {...linkStyle("/portfolio")}>
-          Portfolio
-        </Link>
+        {currentUser?.is_admin && (
+          <>
+            <Link to="/admin/users" {...linkStyle("/admin/users")}>
+              User Management
+            </Link>
+            <Link to="/admin/administrators" {...linkStyle("/admin/administrators")}>
+              Admin Management
+            </Link>
+            <Link to="/admin/trading" {...linkStyle("/admin/trading")}>
+              Trading Monitor
+            </Link>
+            <Link to="/admin/tickets" {...linkStyle("/admin/tickets")}>
+              Tickets
+            </Link>
+            <Link to="/admin/chats" {...linkStyle("/admin/chats")}>
+              Chats
+            </Link>
+            <Link to="/admin/stocks" {...linkStyle("/admin/stocks")}>
+              Stock Management
+            </Link>
+          </>
+        )}
 
-        <Link to="/watchlist" {...linkStyle("/watchlist")}>
-          Watchlist
-        </Link>
+        {!currentUser?.is_admin && (
+          <>
+            <Link to="/portfolio" {...linkStyle("/portfolio")}>
+              Portfolio
+            </Link>
 
-        <Link to="/trade" {...linkStyle("/trade")}>
-          Trade
-        </Link>
+            <Link to="/watchlist" {...linkStyle("/watchlist")}>
+              Watchlist
+            </Link>
 
-        <Link to="/history" {...linkStyle("/history")}>
-          History
-        </Link>
+            <Link to="/trade" {...linkStyle("/trade")}>
+              Trade
+            </Link>
 
-        <Link to="/ai-assistant" {...linkStyle("/ai-assistant")}>
-          AI Assistant
-        </Link>
+            <Link to="/history" {...linkStyle("/history")}>
+              History
+            </Link>
 
-        <Link to="/alerts" {...linkStyle("/alerts")}>
-          Alerts
-        </Link>
+            <Link to="/ai-assistant" {...linkStyle("/ai-assistant")}>
+              AI Assistant
+            </Link>
 
-        <Link to="/risk-dashboard" {...linkStyle("/risk-dashboard")}>
-          Risk
-        </Link>
+            <Link to="/alerts" {...linkStyle("/alerts")}>
+              Alerts
+            </Link>
+
+            <Link to="/risk-dashboard" {...linkStyle("/risk-dashboard")}>
+              Risk
+            </Link>
+          </>
+        )}
 
         <Link to="/profile" {...linkStyle("/profile")}>
           Profile
         </Link>
-
-        {currentUser?.is_admin && (
-          <Link to="/admin" {...linkStyle("/admin")}>
-            Admin
-          </Link>
-        )}
 
         <div className="ml-auto relative flex items-center gap-4">
           <button

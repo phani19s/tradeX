@@ -47,6 +47,12 @@ function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  useEffect(() => {
+    if (isAdmin) {
+      navigate("/admin");
+    }
+  }, [isAdmin, navigate]);
+
   async function loadDashboard() {
     const response = await api.get("/dashboard/", getAuthHeaders());
     setData(response.data);

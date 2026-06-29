@@ -21,6 +21,12 @@ import ForgotPassword from "./pages/ForgotPassword";
 import AiAssistant from "./pages/AiAssistant";
 import Alerts from "./pages/Alerts";
 import RiskDashboard from "./pages/RiskDashboard";
+import AdminUsersPage from "./pages/AdminUsersPage";
+import AdminAdminsPage from "./pages/AdminAdminsPage";
+import AdminTicketsPage from "./pages/AdminTicketsPage";
+import AdminChatsPage from "./pages/AdminChatsPage";
+import AdminTradingPage from "./pages/AdminTradingPage";
+import AdminStocksPage from "./pages/AdminStocksPage";
 
 function App() {
   return (
@@ -87,6 +93,36 @@ function App() {
         <Route
           path="/admin"
           element={<AdminPanel />}
+        />
+
+        <Route
+          path="/admin/users"
+          element={<AdminUsersPage />}
+        />
+
+        <Route
+          path="/admin/administrators"
+          element={<AdminAdminsPage />}
+        />
+
+        <Route
+          path="/admin/trading"
+          element={<AdminTradingPage />}
+        />
+
+        <Route
+          path="/admin/tickets"
+          element={<AdminTicketsPage />}
+        />
+
+        <Route
+          path="/admin/chats"
+          element={<AdminChatsPage />}
+        />
+
+        <Route
+          path="/admin/stocks"
+          element={<AdminStocksPage />}
         />
 
         <Route

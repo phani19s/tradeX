@@ -42,7 +42,14 @@ from app.schemas.otp import (
 
 from app.core.otp import generate_otp
 
-from app.core.email import APP_BASE_URL, send_otp_email, send_password_reset_otp_email, send_two_factor_otp_email
+from app.core.email import (
+    APP_BASE_URL,
+    send_otp_email,
+    send_password_reset_otp_email,
+    send_two_factor_otp_email,
+    send_admin_registration_otp_email,
+    APPROVAL_EMAIL
+)
 from app.core.device import parse_user_agent
 
 from app.models.login_history import LoginHistory
@@ -55,174 +62,10 @@ import struct
 import time
 from hashlib import sha1
 from urllib.parse import quote
-
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"]
 )
-
-@router.post("/send-otp")
-def send_otp(
-    request: SendOTPRequest,
-    db: Session = Depends(get_db)
-):
-
-    existing_user = (
-        db.query(User)
-        .filter(
-            User.email == request.email
-        )
-        .first()
-    )
-
-    if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
-        )
-
-    otp = generate_otp()
-
-    otp_record = OTPVerification(
-        email=request.email,
-        otp=otp
-    )
-
-    db.add(otp_record)
-
-    db.commit()
-
-    send_otp_email(
-        request.email,
-        otp
-    )
-
-    return {
-        "message":
-        "OTP sent successfully"
-    }
-
-@router.post("/verify-otp")
-def verify_otp(
-    request: VerifyOTPRequest,
-    db: Session = Depends(get_db)
-):
-
-    otp_record = (
-        db.query(
-            OTPVerification
-        )
-        .filter(
-            OTPVerification.email
-            == request.email,
-
-            OTPVerification.otp
-            == request.otp
-        )
-        .order_by(
-            OTPVerification.id.desc()
-        )
-        .first()
-    )
-
-    if not otp_record:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid OTP"
-        )
-
-    if (
-        otp_record.expires_at
-        < datetime.utcnow()
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="OTP expired"
-        )
-
-    otp_record.verified = True
-
-    db.commit()
-
-    return {
-        "message":
-        "OTP verified successfully"
-    }
-
-@router.post("/register")
-def register_user(
-    user: UserCreate,
-    db: Session = Depends(get_db)
-):
-
-    existing_user = (
-        db.query(User)
-        .filter(User.email == user.email)
-        .first()
-    )
-
-    otp_record = (
-        db.query(OTPVerification)
-        .filter(
-            OTPVerification.email
-            == user.email,
-    
-            OTPVerification.verified
-            == True
-        )
-        .order_by(
-            OTPVerification.id.desc()
-        )
-        .first()
-    )
-    
-    if not otp_record:
-    
-        raise HTTPException(
-            status_code=400,
-            detail="Please verify OTP first"
-        )
-
-
-    if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
-        )
-
-    hashed_password = hash_password(
-        user.password
-    )
-
-    new_user = User(
-        username=user.username,
-        email=user.email,
-        password=hashed_password
-    )
-
-    db.add(new_user)
-    
-    db.commit()
-    
-    db.refresh(new_user)
-    
-    portfolio = Portfolio(
-        user_id=new_user.id,
-        balance=0
-    )
-    
-    db.add(portfolio)
-    
-    db.commit()
-
-    db.delete(otp_record)
-    db.commit()
-
-    return {
-        "message": "User Registered Successfully"
-    }
-
 
 def get_request_context(request: Request):
     forwarded_for = request.headers.get("x-forwarded-for")
@@ -347,7 +190,8 @@ def build_login_response(
             "email": user.email,
             "two_factor_enabled": user.two_factor_enabled,
             "two_factor_method": user.two_factor_method,
-            "is_admin": user.is_admin
+            "is_admin": user.is_admin,
+            "role": user.role
         }
     }
 
@@ -756,6 +600,248 @@ def reset_forgot_password(
 
     return {
         "message": "Password updated successfully"
+    }
+
+@router.post("/send-otp")
+def send_otp(
+    request: SendOTPRequest,
+    db: Session = Depends(get_db)
+):
+
+    existing_user = (
+        db.query(User)
+        .filter(
+            User.email == request.email
+        )
+        .first()
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
+    if request.role == "Administrator":
+        # Generate two OTPs
+        user_otp = generate_otp()
+        user_otp_record = OTPVerification(
+            email=request.email,
+            otp=user_otp
+        )
+        db.add(user_otp_record)
+
+        admin_otp = generate_otp()
+        admin_otp_record = OTPVerification(
+            email=f"admin_{request.email}",
+            otp=admin_otp
+        )
+        db.add(admin_otp_record)
+
+        db.commit()
+
+        # Send User OTP to registered email
+        send_otp_email(
+            request.email,
+            user_otp
+        )
+
+        # Send Admin OTP to APPROVAL_EMAIL (tradex.adminn@gmail.com)
+        send_admin_registration_otp_email(
+            APPROVAL_EMAIL,
+            request.email,
+            admin_otp
+        )
+
+        return {
+            "message": "OTPs sent successfully to user and admin"
+        }
+    else:
+        # Trader flow
+        otp = generate_otp()
+
+        otp_record = OTPVerification(
+            email=request.email,
+            otp=otp
+        )
+
+        db.add(otp_record)
+
+        db.commit()
+
+        send_otp_email(
+            request.email,
+            otp
+        )
+
+        return {
+            "message":
+            "OTP sent successfully"
+        }
+
+@router.post("/verify-otp")
+def verify_otp(
+    request: VerifyOTPRequest,
+    db: Session = Depends(get_db)
+):
+
+    target_email = f"admin_{request.email}" if request.is_admin_otp else request.email
+
+    otp_record = (
+        db.query(
+            OTPVerification
+        )
+        .filter(
+            OTPVerification.email
+            == target_email,
+
+            OTPVerification.otp
+            == request.otp
+        )
+        .order_by(
+            OTPVerification.id.desc()
+        )
+        .first()
+    )
+
+    if not otp_record:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid OTP"
+        )
+
+    if (
+        otp_record.expires_at
+        < datetime.utcnow()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="OTP expired"
+        )
+
+    otp_record.verified = True
+
+    db.commit()
+
+    return {
+        "message":
+        "OTP verified successfully"
+    }
+
+@router.post("/register")
+def register_user(
+    user: UserCreate,
+    db: Session = Depends(get_db)
+):
+
+    existing_user = (
+        db.query(User)
+        .filter(User.email == user.email)
+        .first()
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
+    if user.role == "Administrator":
+        # Check both user and admin OTP verification
+        user_otp_record = (
+            db.query(OTPVerification)
+            .filter(
+                OTPVerification.email == user.email,
+                OTPVerification.verified == True
+            )
+            .order_by(OTPVerification.id.desc())
+            .first()
+        )
+
+        admin_otp_record = (
+            db.query(OTPVerification)
+            .filter(
+                OTPVerification.email == f"admin_{user.email}",
+                OTPVerification.verified == True
+            )
+            .order_by(OTPVerification.id.desc())
+            .first()
+        )
+
+        if not user_otp_record or not admin_otp_record:
+            raise HTTPException(
+                status_code=400,
+                detail="Please verify both User OTP and Admin OTP first"
+            )
+
+        if user_otp_record.expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=400,
+                detail="User OTP has expired. Please request a new one."
+            )
+
+        if admin_otp_record.expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=400,
+                detail="Admin OTP has expired. Please request a new one."
+            )
+    else:
+        # Trader flow
+        user_otp_record = (
+            db.query(OTPVerification)
+            .filter(
+                OTPVerification.email == user.email,
+                OTPVerification.verified == True
+            )
+            .order_by(OTPVerification.id.desc())
+            .first()
+        )
+        admin_otp_record = None
+
+        if not user_otp_record:
+            raise HTTPException(
+                status_code=400,
+                detail="Please verify OTP first"
+            )
+
+        if user_otp_record.expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=400,
+                detail="OTP has expired. Please request a new one."
+            )
+
+    hashed_password = hash_password(
+        user.password
+    )
+
+    new_user = User(
+        username=user.username,
+        email=user.email,
+        password=hashed_password,
+        role=user.role,
+        is_admin=True if user.role in ["Administrator", "Super Administrator"] else False
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    portfolio = Portfolio(
+        user_id=new_user.id,
+        balance=0
+    )
+    db.add(portfolio)
+    db.commit()
+
+    if user_otp_record:
+        db.delete(user_otp_record)
+    if admin_otp_record:
+        db.delete(admin_otp_record)
+    db.commit()
+
+    return {
+        "message": "User Registered Successfully"
     }
 
 

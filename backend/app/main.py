@@ -19,6 +19,7 @@ from app.models.stock import Stock
 from app.models.trade import Trade 
 from app.models.watchlist import Watchlist 
 from app.models.otp import OTPVerification
+from app.models.audit_log import AdminAuditLog
 from app.models.deposit import Deposit
 from app.models.sltp import SLTPOrder
 from app.models.support import SupportTicket, SupportMessage
@@ -91,6 +92,39 @@ def ensure_admin_column():
             )
 
 
+def ensure_is_active_column():
+    inspector = inspect(engine)
+    user_columns = [column["name"] for column in inspector.get_columns("users")]
+
+    if "is_active" not in user_columns:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE"
+            )
+
+
+def ensure_permissions_column():
+    inspector = inspect(engine)
+    user_columns = [column["name"] for column in inspector.get_columns("users")]
+
+    if "permissions" not in user_columns:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN permissions VARCHAR"
+            )
+
+
+def ensure_role_column():
+    inspector = inspect(engine)
+    user_columns = [column["name"] for column in inspector.get_columns("users")]
+
+    if "role" not in user_columns:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "ALTER TABLE users ADD COLUMN role VARCHAR NOT NULL DEFAULT 'Trader'"
+            )
+
+
 def ensure_deposit_columns():
     inspector = inspect(engine)
     deposit_columns = [column["name"] for column in inspector.get_columns("deposits")]
@@ -133,6 +167,12 @@ def ensure_stock_columns():
     with engine.begin() as connection:
         if "previous_close" not in stock_columns:
             connection.exec_driver_sql("ALTER TABLE stocks ADD COLUMN previous_close FLOAT")
+        if "market" not in stock_columns:
+            connection.exec_driver_sql("ALTER TABLE stocks ADD COLUMN market VARCHAR DEFAULT 'NSE'")
+        if "is_active" not in stock_columns:
+            connection.exec_driver_sql("ALTER TABLE stocks ADD COLUMN is_active BOOLEAN DEFAULT TRUE")
+        if "updated_at" not in stock_columns:
+            connection.exec_driver_sql("ALTER TABLE stocks ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
 
         connection.exec_driver_sql(
             "UPDATE stocks SET previous_close = current_price WHERE previous_close IS NULL"
@@ -146,6 +186,8 @@ def ensure_trade_columns():
         with engine.begin() as connection:
             if "note" not in trade_columns:
                 connection.exec_driver_sql("ALTER TABLE trades ADD COLUMN note VARCHAR")
+            if "created_at" not in trade_columns:
+                connection.exec_driver_sql("ALTER TABLE trades ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
 
     if "sltp_orders" in inspector.get_table_names():
         sltp_columns = [column["name"] for column in inspector.get_columns("sltp_orders")]
@@ -155,7 +197,7 @@ def ensure_trade_columns():
 
 
 def seed_admin_user():
-    admin_email = "tradex.adminn@gmail.com"
+    admin_email = "admin@tradex.com"
     admin_password = "Admin@123"
 
     db = SessionLocal()
@@ -172,12 +214,27 @@ def seed_admin_user():
                 username="Admin",
                 email=admin_email,
                 password=hash_password(admin_password),
-                is_admin=True
+                is_admin=True,
+                role="Super Administrator",
+                permissions="Dashboard Access,User Management,Trading Management,Support Management,Reports,System Settings"
             )
 
             db.add(admin)
             db.commit()
             db.refresh(admin)
+        else:
+            updated = False
+            if not admin.is_admin:
+                admin.is_admin = True
+                updated = True
+            if admin.role != "Super Administrator":
+                admin.role = "Super Administrator"
+                updated = True
+            if admin.permissions != "Dashboard Access,User Management,Trading Management,Support Management,Reports,System Settings":
+                admin.permissions = "Dashboard Access,User Management,Trading Management,Support Management,Reports,System Settings"
+                updated = True
+            if updated:
+                db.commit()
 
         portfolio = (
             db.query(Portfolio)
@@ -414,6 +471,9 @@ app = FastAPI(
 
 ensure_user_profile_columns()
 ensure_admin_column()
+ensure_is_active_column()
+ensure_permissions_column()
+ensure_role_column()
 ensure_deposit_columns()
 ensure_stock_columns()
 ensure_withdrawal_columns()
@@ -455,13 +515,17 @@ def start_alert_worker_once():
     )
     worker.start()
 
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "https://tradex-frontend-mfxa.onrender.com",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://tradex-frontend-mfxa.onrender.com",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

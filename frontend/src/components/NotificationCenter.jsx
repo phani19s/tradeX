@@ -42,9 +42,17 @@ function NotificationCenter({ isOpen, onClose }) {
       window.removeEventListener("tradex_notifications_updated", handleNotificationUpdate);
     };
   }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen) {
+      setConfirmDialog(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     function handleClickOutside(event) {
+      if (event.target.closest(".confirm-dialog-overlay")) {
+        return;
+      }
       if (modalRef.current && !modalRef.current.contains(event.target)) {
         onClose();
       }

@@ -14,12 +14,16 @@ function Register() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("Trader");
 
   const [otp, setOtp] = useState("");
+  const [adminOtp, setAdminOtp] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
 
   const [otpSent, setOtpSent] = useState(false);
 
   const [otpVerified, setOtpVerified] = useState(false);
+  const [adminOtpVerified, setAdminOtpVerified] = useState(false);
 
   const navigate = useNavigate();
 
@@ -43,14 +47,22 @@ function Register() {
       await api.post(
         "/auth/send-otp",
         {
-          email
+          email,
+          role
         }
       );
 
-      toast.success("OTP Sent Successfully");
+      toast.success(
+        role === "Administrator"
+          ? "OTPs Sent to your email and Admin email"
+          : "OTP Sent Successfully"
+      );
 
       setOtpSent(true);
       setOtp("");
+      setAdminOtp("");
+      setOtpVerified(false);
+      setAdminOtpVerified(false);
 
     } catch (error) {
 
@@ -68,13 +80,20 @@ function Register() {
       await api.post(
         "/auth/send-otp",
         {
-          email
+          email,
+          role
         }
       );
 
-      toast.success("OTP resent successfully");
+      toast.success(
+        role === "Administrator"
+          ? "OTPs resent to your email and Admin email"
+          : "OTP resent successfully"
+      );
       setOtp("");
+      setAdminOtp("");
       setOtpVerified(false);
+      setAdminOtpVerified(false);
       setOtpSent(true);
     } catch (error) {
       toast.error(
@@ -84,7 +103,7 @@ function Register() {
     }
   };
 
-  const verifyOTP = async () => {
+  const verifyUserOTP = async () => {
 
     try {
 
@@ -96,7 +115,7 @@ function Register() {
         }
       );
 
-      toast.success("OTP Verified Successfully");
+      toast.success("User OTP Verified Successfully");
 
       setOtpVerified(true);
 
@@ -104,7 +123,34 @@ function Register() {
 
       toast.error(
         error.response?.data?.detail ||
-        "Invalid OTP"
+        "Invalid User OTP"
+      );
+
+    }
+  };
+
+  const verifyAdminOTP = async () => {
+
+    try {
+
+      await api.post(
+        "/auth/verify-otp",
+        {
+          email,
+          otp: adminOtp,
+          is_admin_otp: true
+        }
+      );
+
+      toast.success("Admin OTP Verified Successfully");
+
+      setAdminOtpVerified(true);
+
+    } catch (error) {
+
+      toast.error(
+        error.response?.data?.detail ||
+        "Invalid Admin OTP"
       );
 
     }
@@ -119,7 +165,8 @@ function Register() {
         {
           username,
           email,
-          password
+          password,
+          role
         }
       );
 
@@ -247,14 +294,6 @@ return (
           Create Your Trading Account
         </p>
 
-        <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-blue-100">
-          {/* <p className="mb-2 font-semibold text-white">Workflow</p> */}
-          <ol className="space-y-1">
-            <li>1. Enter your details.</li>
-            <li>2. Send or resend OTP to your email.</li>
-            <li>3. Verify OTP, then create the account.</li>
-          </ol>
-        </div>
 
         <input
           type="text"
@@ -322,6 +361,62 @@ return (
         "
         />
 
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
+          Select Role
+        </label>
+        <div className="flex gap-4 mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              setRole("Trader");
+              setOtpSent(false);
+              setOtpVerified(false);
+              setAdminOtpVerified(false);
+              setOtp("");
+              setAdminOtp("");
+            }}
+            className={`
+              flex-1
+              p-4
+              rounded-xl
+              border
+              transition-all
+              font-semibold
+              ${role === "Trader"
+                ? "bg-blue-600/30 border-blue-400 text-white shadow-[0_0_15px_rgba(96,165,250,0.3)]"
+                : "bg-white/10 border-white/20 text-gray-300 hover:bg-white/20"
+              }
+            `}
+          >
+            Trader
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setRole("Administrator");
+              setOtpSent(false);
+              setOtpVerified(false);
+              setAdminOtpVerified(false);
+              setOtp("");
+              setAdminOtp("");
+            }}
+            className={`
+              flex-1
+              p-4
+              rounded-xl
+              border
+              transition-all
+              font-semibold
+              ${role === "Administrator"
+                ? "bg-blue-600/30 border-blue-400 text-white shadow-[0_0_15px_rgba(96,165,250,0.3)]"
+                : "bg-white/10 border-white/20 text-gray-300 hover:bg-white/20"
+              }
+            `}
+          >
+            Administrator
+          </button>
+        </div>
+
         {!otpSent && (
 
           <button
@@ -340,95 +435,227 @@ return (
 
         )}
 
-        {otpSent && !otpVerified && (
-
+        {otpSent && role === "Trader" && (
           <>
+            {!otpVerified ? (
+              <>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Enter OTP"
+                    value={otp}
+                    onChange={(e) =>
+                      setOtp(e.target.value)
+                    }
+                    className="
+                    w-full
+                    bg-white/10
+                    border
+                    border-white/20
+                    text-white
+                    placeholder-gray-300
+                    p-4
+                    rounded-xl
+                    mt-4
+                    outline-none
+                    focus:border-green-400
+                  "
+                  />
+                  <div className="text-right mt-1 mb-4">
+                    <button
+                      type="button"
+                      onClick={resendOTP}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition focus:outline-none bg-transparent border-0 cursor-pointer"
+                    >
+                      Resend OTP
+                    </button>
+                  </div>
+                </div>
 
-            <input
-              type="text"
-              placeholder="Enter OTP"
-              value={otp}
-              onChange={(e) =>
-                setOtp(e.target.value)
-              }
-              className="
-              w-full
-              bg-white/10
-              border
-              border-white/20
-              text-white
-              placeholder-gray-300
-              p-4
-              rounded-xl
-              mt-4
-              mb-4
-              outline-none
-              focus:border-green-400
-            "
-            />
+                <button
+                  onClick={verifyUserOTP}
+                  className="
+                  w-full
+                  bg-green-600
+                  text-white
+                  p-4
+                  rounded-xl
+                  hover:bg-green-700
+                "
+                >
+                  Verify OTP
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-green-400 text-center font-bold mt-4 mb-4">
+                  OTP Verified Successfully
+                </div>
 
-            <button
-              onClick={verifyOTP}
-              className="
-              w-full
-              bg-green-600
-              text-white
-              p-4
-              rounded-xl
-              hover:bg-green-700
-            "
-            >
-              Verify OTP
-            </button>
-
-            <button
-              type="button"
-              onClick={resendOTP}
-              className="
-              mt-3
-              w-full
-              rounded-xl
-              border
-              border-white/20
-              px-4
-              py-3
-              text-white
-              transition
-              hover:bg-white/10
-            "
-            >
-              Resend OTP
-            </button>
-
+                <button
+                  onClick={handleRegister}
+                  className="
+                  w-full
+                  bg-purple-600
+                  text-white
+                  p-4
+                  rounded-xl
+                  hover:bg-purple-700
+                "
+                >
+                  Create Account
+                </button>
+              </>
+            )}
           </>
-
         )}
 
-        {otpVerified && (
-
+        {otpSent && role === "Administrator" && (
           <>
-
-            <div className="text-green-400 text-center font-bold mt-4 mb-4">
-              OTP Verified Successfully
+            {/* User OTP Section */}
+            <div className="mt-4 mb-4 p-4 rounded-xl border border-white/10 bg-white/5">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
+                User OTP (Sent to your email)
+              </label>
+              {otpVerified ? (
+                <div className="text-green-400 font-bold py-2 flex items-center gap-2">
+                  ✓ User OTP Verified
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Enter User OTP"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      className="
+                      w-full
+                      bg-white/10
+                      border
+                      border-white/20
+                      text-white
+                      placeholder-gray-300
+                      p-3
+                      rounded-xl
+                      outline-none
+                      focus:border-green-400
+                    "
+                    />
+                    <div className="text-right mt-1">
+                      <button
+                        type="button"
+                        onClick={resendOTP}
+                        className="text-xs text-blue-400 hover:text-blue-300 transition focus:outline-none bg-transparent border-0 cursor-pointer"
+                      >
+                        Resend OTP
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={verifyUserOTP}
+                    className="
+                    w-full
+                    bg-green-600
+                    text-white
+                    p-3
+                    rounded-xl
+                    hover:bg-green-700
+                    text-sm
+                    font-semibold
+                  "
+                  >
+                    Verify User OTP
+                  </button>
+                </div>
+              )}
             </div>
 
-            <button
-              onClick={handleRegister}
-              className="
-              w-full
-              bg-purple-600
-              text-white
-              p-4
-              rounded-xl
-              hover:bg-purple-700
-            "
-            >
-              Create Account
-            </button>
+            {/* Admin OTP Section */}
+            <div className="mb-4 p-4 rounded-xl border border-white/10 bg-white/5">
+              <label className="block text-sm font-semibold text-blue-200 mb-2">
+                Admin OTP (Sent to tradex.adminn@gmail.com)
+              </label>
+              {adminOtpVerified ? (
+                <div className="text-green-400 font-bold py-2 flex items-center gap-2">
+                  ✓ Admin OTP Verified
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Enter Admin OTP"
+                      value={adminOtp}
+                      onChange={(e) => setAdminOtp(e.target.value)}
+                      className="
+                      w-full
+                      bg-white/10
+                      border
+                      border-white/20
+                      text-white
+                      placeholder-gray-300
+                      p-3
+                      rounded-xl
+                      outline-none
+                      focus:border-green-400
+                    "
+                    />
+                    <div className="text-right mt-1">
+                      <button
+                        type="button"
+                        onClick={resendOTP}
+                        className="text-xs text-blue-400 hover:text-blue-300 transition focus:outline-none bg-transparent border-0 cursor-pointer"
+                      >
+                        Resend OTP
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={verifyAdminOTP}
+                    className="
+                    w-full
+                    bg-green-600
+                    text-white
+                    p-3
+                    rounded-xl
+                    hover:bg-green-700
+                    text-sm
+                    font-semibold
+                  "
+                  >
+                    Verify Admin OTP
+                  </button>
+                </div>
+              )}
+            </div>
 
+            {/* Register Button */}
+            {otpVerified && adminOtpVerified && (
+              <>
+                <div className="text-green-400 text-center font-bold mb-4">
+                  Both OTPs Verified Successfully
+                </div>
+                <button
+                  onClick={handleRegister}
+                  className="
+                  w-full
+                  bg-purple-600
+                  text-white
+                  p-4
+                  rounded-xl
+                  hover:bg-purple-700
+                  font-bold
+                "
+                >
+                  Create Account
+                </button>
+              </>
+            )}
           </>
-
         )}
+
+
 
         <p className="mt-6 text-center text-gray-300">
 

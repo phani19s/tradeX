@@ -86,28 +86,28 @@ function Trade() {
   }, []);
 
   const cards = useMemo(() => {
-    if (!summary) return [];
+    const s = summary || { cash_balance: 0, invested_amount: 0, total_portfolio_value: 0, profit: 0 };
     return [
       {
         label: "Cash Balance",
-        value: `₹${formatPrice(summary.cash_balance)}`,
+        value: `₹${formatPrice(s.cash_balance)}`,
         note: "Ready to deploy",
       },
       {
         label: "Invested Amount",
-        value: `₹${formatPrice(summary.invested_amount)}`,
+        value: `₹${formatPrice(s.invested_amount)}`,
         note: "Currently held",
       },
       {
         label: "Portfolio Value",
-        value: `₹${formatPrice(summary.total_portfolio_value)}`,
+        value: `₹${formatPrice(s.total_portfolio_value)}`,
         note: "Cash + investments",
       },
       {
         label: "Total Profit",
-        value: `${summary.profit >= 0 ? "+" : ""}₹${formatPrice(summary.profit)}`,
+        value: `${s.profit >= 0 ? "+" : ""}₹${formatPrice(s.profit)}`,
         note: "Value - Deposits",
-        positive: summary.profit >= 0,
+        positive: s.profit >= 0,
       },
     ];
   }, [summary]);

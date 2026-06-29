@@ -73,31 +73,28 @@ function Portfolio() {
   }, []);
 
   const cards = useMemo(() => {
-    if (!summary) {
-      return [];
-    }
-
+    const s = summary || { cash_balance: 0, invested_amount: 0, total_portfolio_value: 0, profit: 0 };
     return [
       {
         label: "Cash Balance",
-        value: `₹${formatMoney(summary.cash_balance)}`,
+        value: `₹${formatMoney(s.cash_balance)}`,
         note: "Ready to deploy",
       },
       {
         label: "Invested Amount",
-        value: `₹${formatMoney(summary.invested_amount)}`,
+        value: `₹${formatMoney(s.invested_amount)}`,
         note: "Currently held in positions",
       },
       {
         label: "Portfolio Value",
-        value: `₹${formatMoney(summary.total_portfolio_value)}`,
+        value: `₹${formatMoney(s.total_portfolio_value)}`,
         note: "Cash + investments",
       },
       {
         label: "Total Profit",
-        value: `${summary.profit >= 0 ? "+" : ""}₹${formatMoney(summary.profit)}`,
+        value: `${s.profit >= 0 ? "+" : ""}₹${formatMoney(s.profit)}`,
         note: "Portfolio Value - Deposits",
-        positive: summary.profit >= 0,
+        positive: s.profit >= 0,
       },
     ];
   }, [summary]);

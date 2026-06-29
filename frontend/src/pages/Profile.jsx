@@ -319,9 +319,117 @@ function Profile() {
     }
   };
 
-  const formatDateTime = (value) => {
-    return new Date(value).toLocaleString();
-  };
+  const sessionManagementBlock = (
+    <div className="rounded-[28px] border p-6 shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+      <h2 className="text-2xl font-bold mb-4">Session Management</h2>
+      <p className="text-sm opacity-70 mb-6">Manage active sessions and secure your account.</p>
+
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <button
+          type="button"
+          onClick={handleToggleSessions}
+          className="flex-1 rounded-xl py-3 font-bold transition hover:opacity-90"
+          style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+        >
+          {showSessions ? "Hide Active Sessions" : "View Active Sessions"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            requestConfirm({
+              title: "Logout other devices?",
+              message: "This will immediately terminate every active session except this one.",
+              confirmText: "Logout Devices",
+              action: handleLogoutOtherDevices,
+            })
+          }
+          disabled={loggingOutOthers}
+          className="flex-1 rounded-xl bg-red-500 py-3 font-bold text-white transition disabled:opacity-60"
+        >
+          {loggingOutOthers ? "Logging Out..." : "Logout Other Devices"}
+        </button>
+      </div>
+
+      {showSessions && (
+        <div className="mt-6 border-t pt-6" style={{ borderColor: "var(--border)" }}>
+          {sessionsLoading ? (
+            <div className="rounded-2xl border p-4 text-sm opacity-70" style={{ borderColor: "var(--border)", background: "var(--accent-soft)" }}>
+              Loading active sessions...
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="rounded-2xl border p-4 text-sm opacity-70" style={{ borderColor: "var(--border)", background: "var(--accent-soft)" }}>
+              No active sessions found.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
+              <table className="w-full text-left">
+                <thead className="border-b" style={{ borderColor: "var(--border)" }}>
+                  <tr>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Device</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Browser/App</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">IP Address</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Location</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Login Time</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Last Activity</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Session Status</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Current</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Duration</th>
+                    <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map((session) => (
+                    <tr key={session.id} className="border-b last:border-0 hover:bg-white/5" style={{ borderColor: "var(--border)" }}>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm">{formatDevice(session.device, session.browser)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm">{formatBrowser(session.device, session.browser)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm">{session.ip_address || "Unknown"}</td>
+                      <td className="min-w-[180px] px-4 py-4 text-sm">{session.location || "Unknown Location"}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm">{formatSecurityDate(session.created_at)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm">{formatSecurityDate(session.last_activity)}</td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wider ${getStatusClass(session.status || "Active")}`}>
+                          {session.status || "Active"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        {session.is_current ? (
+                          <span className="inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-500">
+                            Current Session
+                          </span>
+                        ) : (
+                          <span className="text-xs opacity-50">-</span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm">{formatDuration(session.session_duration)}</td>
+                      <td className="px-4 py-4">
+                        <button
+                          type="button"
+                          disabled={session.is_current}
+                          onClick={() =>
+                            requestConfirm({
+                              title: "Logout this session?",
+                              message: "This device will be signed out immediately and will need to login again.",
+                              confirmText: "Logout Session",
+                              action: () => handleLogoutSession(session.id),
+                            })
+                          }
+                          className="rounded-xl border px-3 py-2 text-xs font-bold text-rose-500 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                          style={{ borderColor: "var(--border)" }}
+                        >
+                          Logout
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   if (loading) {
     return (
@@ -459,115 +567,7 @@ function Profile() {
                 </form>
               </div>
 
-              <div className="rounded-[28px] border p-6 shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-                <h2 className="text-2xl font-bold mb-4">Session Management</h2>
-                <p className="text-sm opacity-70 mb-6">Manage active sessions and secure your account.</p>
-
-                <div className="flex flex-col gap-4 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={handleToggleSessions}
-                    className="flex-1 rounded-xl py-3 font-bold transition hover:opacity-90"
-                    style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
-                  >
-                    {showSessions ? "Hide Active Sessions" : "View Active Sessions"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      requestConfirm({
-                        title: "Logout other devices?",
-                        message: "This will immediately terminate every active session except this one.",
-                        confirmText: "Logout Devices",
-                        action: handleLogoutOtherDevices,
-                      })
-                    }
-                    disabled={loggingOutOthers}
-                    className="flex-1 rounded-xl bg-red-500 py-3 font-bold text-white transition disabled:opacity-60"
-                  >
-                    {loggingOutOthers ? "Logging Out..." : "Logout Other Devices"}
-                  </button>
-                </div>
-
-                {showSessions && (
-                  <div className="mt-6 border-t pt-6" style={{ borderColor: "var(--border)" }}>
-                    {sessionsLoading ? (
-                      <div className="rounded-2xl border p-4 text-sm opacity-70" style={{ borderColor: "var(--border)", background: "var(--accent-soft)" }}>
-                        Loading active sessions...
-                      </div>
-                    ) : sessions.length === 0 ? (
-                      <div className="rounded-2xl border p-4 text-sm opacity-70" style={{ borderColor: "var(--border)", background: "var(--accent-soft)" }}>
-                        No active sessions found.
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
-                        <table className="w-full text-left">
-                          <thead className="border-b" style={{ borderColor: "var(--border)" }}>
-                            <tr>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Device</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Browser/App</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">IP Address</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Location</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Login Time</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Last Activity</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Session Status</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Current</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Duration</th>
-                              <th className="px-4 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sessions.map((session) => (
-                              <tr key={session.id} className="border-b last:border-0 hover:bg-white/5" style={{ borderColor: "var(--border)" }}>
-                                <td className="whitespace-nowrap px-4 py-4 text-sm">{formatDevice(session.device, session.browser)}</td>
-                                <td className="whitespace-nowrap px-4 py-4 text-sm">{formatBrowser(session.device, session.browser)}</td>
-                                <td className="whitespace-nowrap px-4 py-4 text-sm">{session.ip_address || "Unknown"}</td>
-                                <td className="min-w-[180px] px-4 py-4 text-sm">{session.location || "Unknown Location"}</td>
-                                <td className="whitespace-nowrap px-4 py-4 text-sm">{formatSecurityDate(session.created_at)}</td>
-                                <td className="whitespace-nowrap px-4 py-4 text-sm">{formatSecurityDate(session.last_activity)}</td>
-                                <td className="px-4 py-4">
-                                  <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wider ${getStatusClass(session.status || "Active")}`}>
-                                    {session.status || "Active"}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4">
-                                  {session.is_current ? (
-                                    <span className="inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/15 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-500">
-                                      Current Session
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs opacity-50">-</span>
-                                  )}
-                                </td>
-                                <td className="whitespace-nowrap px-4 py-4 text-sm">{formatDuration(session.session_duration)}</td>
-                                <td className="px-4 py-4">
-                                  <button
-                                    type="button"
-                                    disabled={session.is_current}
-                                    onClick={() =>
-                                      requestConfirm({
-                                        title: "Logout this session?",
-                                        message: "This device will be signed out immediately and will need to login again.",
-                                        confirmText: "Logout Session",
-                                        action: () => handleLogoutSession(session.id),
-                                      })
-                                    }
-                                    className="rounded-xl border px-3 py-2 text-xs font-bold text-rose-500 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-40"
-                                    style={{ borderColor: "var(--border)" }}
-                                  >
-                                    Logout
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {!profile.is_admin && sessionManagementBlock}
 
               <div className="rounded-[28px] border p-6 shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
                 <div className="flex justify-between items-center mb-4">
@@ -734,44 +734,48 @@ function Profile() {
                 </div>
               </div>
 
-              <div className="rounded-[28px] border p-6 shadow-xl space-y-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-                <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-2xl font-bold">Help & Support</h2>
-                  <Link
-                    to="/profile/tickets"
-                    className="px-4 py-2 rounded-xl text-sm font-bold transition hover:opacity-90 shadow-lg"
-                    style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
-                  >
-                    My Tickets
-                  </Link>
-                </div>
-                <p className="text-sm opacity-70">Having issues? Reach out to our team for assistance.</p>
-
-                <div className="space-y-4 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsChatOpen(true)}
-                    className="w-full rounded-2xl p-4 border border-dashed flex justify-center items-center gap-2 font-bold text-lg transition hover:bg-white/5"
-                    style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
-                  >
-                    <span>Chat</span> Chat With Us
-                  </button>
-
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                    <p className="text-xs font-bold uppercase tracking-wider opacity-50 mb-1">Account Issues</p>
-                    <a href="mailto:tradex.support@gmail.com" className="text-sm md:text-lg font-bold hover:text-accent transition">
-                      tradex.support@gmail.com
-                    </a>
+              {profile.is_admin ? (
+                sessionManagementBlock
+              ) : (
+                <div className="rounded-[28px] border p-6 shadow-xl space-y-4" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                  <div className="flex justify-between items-center mb-2">
+                    <h2 className="text-2xl font-bold">Help & Support</h2>
+                    <Link
+                      to="/profile/tickets"
+                      className="px-4 py-2 rounded-xl text-sm font-bold transition hover:opacity-90 shadow-lg"
+                      style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
+                    >
+                      My Tickets
+                    </Link>
                   </div>
+                  <p className="text-sm opacity-70">Having issues? Reach out to our team for assistance.</p>
 
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
-                    <p className="text-xs font-bold uppercase tracking-wider opacity-50 mb-1">Payment Related</p>
-                    <a href="mailto:tradex.adminn@gmail.com" className="text-sm md:text-lg font-bold hover:text-accent transition">
-                      tradex.adminn@gmail.com
-                    </a>
+                  <div className="space-y-4 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsChatOpen(true)}
+                      className="w-full rounded-2xl p-4 border border-dashed flex justify-center items-center gap-2 font-bold text-lg transition hover:bg-white/5"
+                      style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+                    >
+                      <span>Chat</span> Chat With Us
+                    </button>
+
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                      <p className="text-xs font-bold uppercase tracking-wider opacity-50 mb-1">Account Issues</p>
+                      <a href="mailto:tradex.support@gmail.com" className="text-sm md:text-lg font-bold hover:text-accent transition">
+                        tradex.support@gmail.com
+                      </a>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                      <p className="text-xs font-bold uppercase tracking-wider opacity-50 mb-1">Payment Related</p>
+                      <a href="mailto:tradex.adminn@gmail.com" className="text-sm md:text-lg font-bold hover:text-accent transition">
+                        tradex.adminn@gmail.com
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

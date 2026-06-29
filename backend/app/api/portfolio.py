@@ -277,37 +277,52 @@ def portfolio_summary(
             * data["price"]
         )
     approved_deposits = (
-            db.query(Deposit)
-            .filter(
-                Deposit.user_id == user_id,
-                Deposit.status == "Approved"
-            )
-            .all()
+        db.query(Deposit)
+        .filter(
+            Deposit.user_id == user_id,
+            Deposit.status == "Approved"
         )
-        
+        .all()
+    )
+    
     total_deposited = sum(
-            deposit.amount
-            for deposit in approved_deposits
+        deposit.amount
+        for deposit in approved_deposits
+    )
+
+    from app.models.withdrawal import Withdrawal
+    approved_withdrawals = (
+        db.query(Withdrawal)
+        .filter(
+            Withdrawal.user_id == user_id,
+            Withdrawal.status == "Approved"
         )
-        
+        .all()
+    )
+
+    total_withdrawn = sum(
+        w.amount
+        for w in approved_withdrawals
+    )
+    
     portfolio_value = (
-            portfolio.balance
-            + invested_amount
-        )
-        
+        portfolio.balance
+        + invested_amount
+    )
+    
     profit = (
-            portfolio_value
-            - total_deposited
-        )
+        portfolio_value
+        + total_withdrawn
+        - total_deposited
+    )
 
     return {
         "cash_balance": portfolio.balance,
         "invested_amount": invested_amount,
-        "total_portfolio_value":portfolio_value,
-        "total_deposited":total_deposited,
-    
-        "profit":profit
-        
+        "total_portfolio_value": portfolio_value,
+        "total_deposited": total_deposited,
+        "total_withdrawn": total_withdrawn,
+        "profit": profit
     }
 
 

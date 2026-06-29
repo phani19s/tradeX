@@ -69,6 +69,12 @@ def buy_stock(
             detail="Stock not found"
         )
 
+    if not stock.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="This stock is currently disabled for trading"
+        )
+
     portfolio = (
         db.query(Portfolio)
         .filter(
@@ -132,6 +138,12 @@ def sell_stock(
         raise HTTPException(
             status_code=404,
             detail="Stock not found"
+        )
+
+    if not stock.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="This stock is currently disabled for trading"
         )
 
     owned_quantity = get_owned_quantity(

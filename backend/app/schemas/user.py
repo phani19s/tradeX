@@ -6,6 +6,7 @@ class UserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str
+    role: str = "Trader"
 
 
 class UserResponse(BaseModel):
@@ -21,6 +22,7 @@ class UserResponse(BaseModel):
     two_factor_enabled: bool = False
     two_factor_method: str | None = None
     is_admin: bool = False
+    role: str = "Trader"
 
     class Config:
         from_attributes = True

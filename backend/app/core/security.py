@@ -189,6 +189,9 @@ def _get_authenticated_entities(
     if user is None:
         raise credentials_exception
 
+    if not user.is_active:
+        raise credentials_exception
+
     session = (
         db.query(UserSession)
         .filter(

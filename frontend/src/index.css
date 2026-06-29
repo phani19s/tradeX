@@ -167,3 +167,14 @@ select option {
   background: var(--surface);
   color: var(--text);
 }
+
+button,
+select,
+a,
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"],
+[role="button"],
+.cursor-pointer {
+  cursor: pointer !important;
+}

@@ -402,6 +402,29 @@ def send_otp_email(receiver_email, otp):
     _send_html_email(receiver_email, "TradeX OTP Verification", body)
 
 
+def send_admin_registration_otp_email(receiver_email, user_email, otp):
+    body = f"""
+    <html>
+    <body style="font-family:Arial,sans-serif;background:#f5f7fa;padding:20px;">
+      <div style="max-width:600px;margin:auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 12px rgba(0,0,0,.1);">
+        <h1 style="color:#2563eb;text-align:center;">TradeX</h1>
+        <h2 style="text-align:center;">Administrator Registration Authorization</h2>
+        <p>An administrator account registration has been requested for user: <strong>{user_email}</strong>.</p>
+        <p>Please authorize this registration by providing the administrator verification code:</p>
+        <div style="font-size:32px;font-weight:bold;text-align:center;letter-spacing:6px;padding:20px;background:#eff6ff;border-radius:8px;color:#2563eb;">
+          {otp}
+        </div>
+        <p style="margin-top:20px;">This OTP will expire in 5 minutes.</p>
+        <hr>
+        <p style="text-align:center;color:#666;">TradeX Team</p>
+      </div>
+    </body>
+    </html>
+    """
+
+    _send_html_email(receiver_email, "TradeX Administrator Authorization OTP", body)
+
+
 def send_two_factor_otp_email(receiver_email, otp):
     body = f"""
     <html>

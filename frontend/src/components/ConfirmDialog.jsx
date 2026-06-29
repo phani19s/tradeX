@@ -16,7 +16,7 @@ function ConfirmDialog({
       : "text-white hover:opacity-90";
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/65 px-4 py-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/65 px-4 py-6 backdrop-blur-sm confirm-dialog-overlay">
       <div
         className="w-full max-w-md rounded-[28px] border p-6 shadow-2xl"
         style={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }}

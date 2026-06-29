@@ -21,6 +21,7 @@ class User(Base):
     
     account_number = Column(String, nullable=True)
     
+    
     ifsc_code = Column(String, nullable=True)
     
     bank_name = Column(String, nullable=True)
@@ -32,6 +33,18 @@ class User(Base):
     is_admin = Column(
         Boolean,
         default=False
+    )
+    is_active = Column(
+        Boolean,
+        default=True
+    )
+    role = Column(
+        String,
+        default="Trader"
+    )
+    permissions = Column(
+        String,
+        nullable=True
     )
 
     created_at = Column(

@@ -3,6 +3,8 @@ from sqlalchemy import Integer
 from sqlalchemy import Float
 from sqlalchemy import String
 from sqlalchemy import ForeignKey
+from sqlalchemy import DateTime
+from datetime import datetime
 
 from app.core.database import Base 
 from sqlalchemy.orm import relationship
@@ -41,6 +43,10 @@ class Trade(Base):
     note = Column(
         String,
         nullable=True
+    )
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
     )
     user = relationship(
     "User",

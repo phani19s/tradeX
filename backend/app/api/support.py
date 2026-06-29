@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Form
+from fastapi import APIRouter, Depends, HTTPException, Form, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
@@ -138,6 +138,7 @@ def admin_list_tickets(
 def admin_update_ticket(
     ticket_id: int,
     payload: TicketStatusUpdate,
+    request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -165,6 +166,13 @@ def admin_update_ticket(
                 
     db.commit()
     db.refresh(ticket)
+    
+    try:
+        from app.api.admin import log_audit
+        log_audit(db, current_user.id, "Update Ticket Status", f"Updated ticket ID {ticket_id} (Number: {ticket.ticket_number}) status to {payload.status}", request.client.host if (request and request.client) else None)
+    except Exception as e:
+        print(f"Failed to log audit for ticket update: {e}")
+
     return ticket
 
 @router.get("/admin/tickets/email/progress", response_class=HTMLResponse)
@@ -362,6 +370,7 @@ def admin_get_user_chat(
 def admin_reply_chat(
     user_id: int,
     payload: MessageCreate,
+    request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -376,6 +385,13 @@ def admin_reply_chat(
     db.add(new_message)
     db.commit()
     db.refresh(new_message)
+    
+    try:
+        from app.api.admin import log_audit
+        user = db.query(User).filter(User.id == user_id).first()
+        log_audit(db, current_user.id, "Reply Support Chat", f"Sent reply to user ID {user_id} ({user.email if user else 'Unknown'}): {payload.message[:100]}", request.client.host if (request and request.client) else None)
+    except Exception as e:
+        print(f"Failed to log audit for chat reply: {e}")
     
     create_notification(
         db, 
