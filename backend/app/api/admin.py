@@ -7,7 +7,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, EmailStr
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.schemas.stock import StockCreate, StockUpdate, StockResponse
 
 import os
@@ -431,6 +431,99 @@ def reject_withdrawal(
     return {"message": "Withdrawal rejected successfully"}
 
 
+@router.get("/maintenance/email/deactivate")
+def deactivate_maintenance_from_email(
+    token: str,
+    db: Session = Depends(get_db)
+):
+    try:
+        from app.core.email import decode_maintenance_action_token
+        payload = decode_maintenance_action_token(token)
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired deactivation link"
+        )
+
+    if payload.get("action") != "deactivate":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid action"
+        )
+
+    from app.models.system_setting import SystemSetting, SettingHistory
+    
+    # Find setting
+    setting = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_mode").first()
+    
+    if not setting:
+        raise HTTPException(
+            status_code=404,
+            detail="Maintenance mode setting not found"
+        )
+        
+    old_val = setting.value
+    if old_val == "false":
+        return HTMLResponse(
+            f"""
+            <html>
+            <body style="font-family:Arial;text-align:center;padding-top:100px;background:#0f172a;color:white;">
+                <h1>ℹ️ System Already Online</h1>
+                <p>Maintenance mode is already <strong>OFF</strong>.</p>
+                <p>You can close this window.</p>
+            </body>
+            </html>
+            """
+        )
+
+    setting.value = "false"
+    
+    # Save setting history
+    history = SettingHistory(
+        setting_key="maintenance_mode",
+        old_value=old_val,
+        new_value="false",
+        changed_by="tradex.adminn@gmail.com"
+    )
+    db.add(history)
+    
+    from app.models.user import User
+    admin_user = db.query(User).filter(User.email == "tradex.adminn@gmail.com").first()
+    if not admin_user:
+        admin_user = db.query(User).filter(User.is_admin == True).first()
+        
+    admin_id = admin_user.id if admin_user else 1
+    
+    log_audit(
+        db,
+        admin_id=admin_id,
+        action="Deactivate Maintenance Mode",
+        details="Deactivated by tradex.adminn@gmail.com via email verification link",
+        ip_address=None
+    )
+    
+    db.commit()
+    
+    # Send email notification that it has been deactivated
+    try:
+        from app.core.email import send_maintenance_mode_email
+        send_maintenance_mode_email(False)
+    except Exception:
+        pass
+
+    return HTMLResponse(
+        f"""
+        <html>
+        <body style="font-family:Arial;text-align:center;padding-top:100px;background:#0f172a;color:white;">
+            <h1>✅ Maintenance Mode Deactivated</h1>
+            <p>TradeX is now back online. The audit log has been updated under <strong>tradex.adminn@gmail.com</strong>.</p>
+            <p>You can close this window.</p>
+        </body>
+        </html>
+        """
+    )
+
+
 @router.get("/deposits/email/approve")
 def approve_deposit_from_email(
     token: str,
@@ -828,7 +921,7 @@ def admin_dashboard(
     total_traders = db.query(User).filter(User.role == "Trader").count()
 
     # 3. Total Administrators
-    total_admins = db.query(User).filter(User.role.in_(["Administrator", "Super Administrator"])).count()
+    total_admins = db.query(User).filter(User.is_admin == True).count()
 
     # 4. Total Deposits
     total_deposits_count = db.query(Deposit).count()
@@ -1333,7 +1426,7 @@ def list_administrators(
 
     admins = (
         db.query(User)
-        .filter(User.role.in_(["Administrator", "Super Administrator"]))
+        .filter(User.is_admin == True)
         .order_by(User.created_at.desc())
         .all()
     )
@@ -1536,8 +1629,8 @@ def list_audit_logs(
         {
             "id": log.id,
             "admin_id": log.admin_id,
-            "admin_email": user.email,
-            "admin_username": user.username,
+            "admin_email": "tradex.adminn@gmail.com" if (log.action == "Deactivate Maintenance Mode" and log.details and "email" in log.details.lower()) else user.email,
+            "admin_username": "tradex.adminn@gmail.com" if (log.action == "Deactivate Maintenance Mode" and log.details and "email" in log.details.lower()) else user.username,
             "action": log.action,
             "details": log.details,
             "ip_address": log.ip_address,
@@ -1887,5 +1980,667 @@ def delete_stock(
     log_audit(db, current_user.id, "Delete Stock", f"Deleted stock symbol: {symbol}", request.client.host if (request and request.client) else None)
 
     return {"message": f"Stock {symbol} deleted successfully"}
+
+
+def generate_pdf(title: str, rows: list) -> bytes:
+    stream_lines = []
+    stream_lines.append("BT")
+    stream_lines.append("/F1 16 Tf")
+    stream_lines.append("72 780 Td")
+    stream_lines.append(f"({title}) Tj")
+    stream_lines.append("0 -40 Td")
+    stream_lines.append("/F1 11 Tf")
+    for row in rows:
+        escaped_row = row.replace("(", "\\(").replace(")", "\\)")
+        stream_lines.append(f"({escaped_row}) Tj")
+        stream_lines.append("0 -20 Td")
+    stream_lines.append("ET")
+    
+    stream_content = "\n".join(stream_lines).encode("utf-8")
+    stream_len = len(stream_content)
+    
+    objects = []
+    objects.append(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+    objects.append(b"2 0 obj\n<< /Type /Pages /Kids [4 0 R] /Count 1 >>\nendobj\n")
+    objects.append(b"3 0 obj\n<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>\nendobj\n")
+    objects.append(b"4 0 obj\n<< /Type /Page /Parent 2 0 R /Resources 3 0 R /MediaBox [0 0 595 842] /Contents 5 0 R >>\nendobj\n")
+    objects.append(f"5 0 obj\n<< /Length {stream_len} >>\nstream\n".encode("utf-8") + stream_content + b"\nendstream\nendobj\n")
+    
+    offsets = [0]
+    pdf_data = b"%PDF-1.4\n"
+    
+    for obj in objects:
+        offsets.append(len(pdf_data))
+        pdf_data += obj
+        
+    xref_start = len(pdf_data)
+    pdf_data += b"xref\n"
+    pdf_data += f"0 {len(objects) + 1}\n".encode("utf-8")
+    pdf_data += b"0000000000 65535 f \n"
+    for offset in offsets[1:]:
+        pdf_data += f"{offset:010d} 00000 n \n".encode("utf-8")
+        
+    pdf_data += b"trailer\n"
+    pdf_data += f"<< /Size {len(objects) + 1} /Root 1 0 R >>\n".encode("utf-8")
+    pdf_data += b"startxref\n"
+    pdf_data += f"{xref_start}\n".encode("utf-8")
+    pdf_data += b"%%EOF\n"
+    
+    return pdf_data
+
+
+@router.get("/reports/generate")
+def generate_report(
+    period: str, # daily, weekly, monthly, custom
+    start_date: str = None,
+    end_date: str = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+
+    # Load required models
+    from app.models.trade import Trade
+    from app.models.stock import Stock
+    from app.models.deposit import Deposit
+    from app.models.withdrawal import Withdrawal
+    from app.models.support import SupportTicket
+    from app.models.price_alert import PriceAlert
+    from app.models.watchlist import Watchlist
+    from sqlalchemy import func
+    import json
+
+    now = datetime.utcnow()
+    
+    if period == "daily":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now
+        report_label = "Daily Report"
+    elif period == "weekly":
+        start = now - timedelta(days=7)
+        end = now
+        report_label = "Weekly Report"
+    elif period == "monthly":
+        start = now - timedelta(days=30)
+        end = now
+        report_label = "Monthly Report"
+    elif period == "custom":
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="Start date and end date are required for custom period")
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, microsecond=999999)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        report_label = f"Custom Report ({start_date} to {end_date})"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid period. Must be daily, weekly, monthly, or custom")
+
+    # Global totals
+    total_users = db.query(User).count()
+    total_traders = db.query(User).filter(User.role == "Trader").count()
+    total_admins = db.query(User).filter(User.is_admin == True).count()
+    total_watchlists = db.query(Watchlist).count()
+    active_price_alerts = db.query(PriceAlert).filter(PriceAlert.is_active == True).count()
+    open_support_tickets = db.query(SupportTicket).filter(SupportTicket.status == "OPEN").count()
+
+    # Period specific metrics
+    new_user_registrations = db.query(User).filter(User.created_at >= start, User.created_at <= end).count()
+    trades_in_period = db.query(Trade).filter(Trade.created_at >= start, Trade.created_at <= end).all()
+    total_trades = len(trades_in_period)
+    total_trading_volume = sum(t.quantity * t.price for t in trades_in_period)
+    profit_loss_summary = sum(t.quantity * t.price if t.trade_type == "SELL" else -t.quantity * t.price for t in trades_in_period)
+
+    total_deposits_count = db.query(Deposit).filter(Deposit.status == "Approved", Deposit.created_at >= start, Deposit.created_at <= end).count()
+    total_deposits_amount = db.query(func.sum(Deposit.amount)).filter(Deposit.status == "Approved", Deposit.created_at >= start, Deposit.created_at <= end).scalar() or 0.0
+    
+    total_withdrawals_count = db.query(Withdrawal).filter(Withdrawal.status == "Approved", Withdrawal.created_at >= start, Withdrawal.created_at <= end).count()
+    total_withdrawals_amount = db.query(func.sum(Withdrawal.amount)).filter(Withdrawal.status == "Approved", Withdrawal.created_at >= start, Withdrawal.created_at <= end).scalar() or 0.0
+
+    metrics = {
+        "total_users": total_users,
+        "total_traders": total_traders,
+        "total_administrators": total_admins,
+        "total_trades": total_trades,
+        "total_deposits_count": total_deposits_count,
+        "total_deposits_amount": float(total_deposits_amount),
+        "total_withdrawals_count": total_withdrawals_count,
+        "total_withdrawals_amount": float(total_withdrawals_amount),
+        "total_trading_volume": float(total_trading_volume),
+        "total_watchlists": total_watchlists,
+        "active_price_alerts": active_price_alerts,
+        "open_support_tickets": open_support_tickets,
+        "new_user_registrations": new_user_registrations,
+        "profit_loss_summary": float(profit_loss_summary)
+    }
+
+    # Save generated report to history database log
+    from app.models.report_history import ReportHistory
+    history_rec = ReportHistory(
+        report_type=period.capitalize(),
+        start_date=start,
+        end_date=end,
+        generated_by=current_user.email,
+        metrics_data=json.dumps(metrics)
+    )
+    db.add(history_rec)
+    db.commit()
+
+    return {
+        "generated_at": now.isoformat(),
+        "generated_by": current_user.email,
+        "period": period,
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "metrics": metrics
+    }
+
+
+@router.post("/reports/export")
+def export_report(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+
+    # Load required models
+    from app.models.trade import Trade
+    from app.models.deposit import Deposit
+    from app.models.withdrawal import Withdrawal
+    from app.models.support import SupportTicket
+    from app.models.price_alert import PriceAlert
+    from app.models.watchlist import Watchlist
+    from sqlalchemy import func
+    from fastapi.responses import StreamingResponse
+    import io
+    import csv
+
+    export_format = payload.get("format", "csv").lower()
+    period = payload.get("period", "daily").lower()
+    start_date = payload.get("start_date")
+    end_date = payload.get("end_date")
+
+    now = datetime.utcnow()
+    
+    if period == "daily":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now
+        report_label = "Daily Report"
+    elif period == "weekly":
+        start = now - timedelta(days=7)
+        end = now
+        report_label = "Weekly Report"
+    elif period == "monthly":
+        start = now - timedelta(days=30)
+        end = now
+        report_label = "Monthly Report"
+    elif period == "custom":
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="Start and end dates required")
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, microsecond=999999)
+        report_label = f"Custom Report ({start_date} to {end_date})"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid period")
+
+    # Re-calculate report metrics securely
+    total_users = db.query(User).count()
+    total_traders = db.query(User).filter(User.role == "Trader").count()
+    total_admins = db.query(User).filter(User.is_admin == True).count()
+    total_watchlists = db.query(Watchlist).count()
+    active_price_alerts = db.query(PriceAlert).filter(PriceAlert.is_active == True).count()
+    open_support_tickets = db.query(SupportTicket).filter(SupportTicket.status == "OPEN").count()
+
+    new_user_registrations = db.query(User).filter(User.created_at >= start, User.created_at <= end).count()
+    trades_in_period = db.query(Trade).filter(Trade.created_at >= start, Trade.created_at <= end).all()
+    total_trades = len(trades_in_period)
+    total_trading_volume = sum(t.quantity * t.price for t in trades_in_period)
+    profit_loss_summary = sum(t.quantity * t.price if t.trade_type == "SELL" else -t.quantity * t.price for t in trades_in_period)
+
+    total_deposits_count = db.query(Deposit).filter(Deposit.status == "Approved", Deposit.created_at >= start, Deposit.created_at <= end).count()
+    total_deposits_amount = db.query(func.sum(Deposit.amount)).filter(Deposit.status == "Approved", Deposit.created_at >= start, Deposit.created_at <= end).scalar() or 0.0
+    
+    total_withdrawals_count = db.query(Withdrawal).filter(Withdrawal.status == "Approved", Withdrawal.created_at >= start, Withdrawal.created_at <= end).count()
+    total_withdrawals_amount = db.query(func.sum(Withdrawal.amount)).filter(Withdrawal.status == "Approved", Withdrawal.created_at >= start, Withdrawal.created_at <= end).scalar() or 0.0
+
+    # Build report structured rows
+    report_data = [
+        ("TradeX System Audit Report", ""),
+        ("Report Name", report_label),
+        ("Generated By", current_user.email),
+        ("Generation Date (UTC)", now.strftime("%Y-%m-%d %H:%M:%S")),
+        ("Period Range Start", start.strftime("%Y-%m-%d %H:%M:%S")),
+        ("Period Range End", end.strftime("%Y-%m-%d %H:%M:%S")),
+        ("", ""),
+        ("System Metric Key", "Calculated Value"),
+        ("Total Users Count", str(total_users)),
+        ("Total Traders Count", str(total_traders)),
+        ("Total Administrators Count", str(total_admins)),
+        ("Total Trades Logged", str(total_trades)),
+        ("Total Deposits Count", str(total_deposits_count)),
+        ("Total Deposits Amount", f"Rs. {total_deposits_amount:,.2f}"),
+        ("Total Withdrawals Count", str(total_withdrawals_count)),
+        ("Total Withdrawals Amount", f"Rs. {total_withdrawals_amount:,.2f}"),
+        ("Total Trading Volume", f"Rs. {total_trading_volume:,.2f}"),
+        ("Total Watchlists", str(total_watchlists)),
+        ("Active Price Alerts", str(active_price_alerts)),
+        ("Open Support Tickets", str(open_support_tickets)),
+        ("New User Registrations", str(new_user_registrations)),
+        ("Profit/Loss Summary", f"Rs. {profit_loss_summary:,.2f}")
+    ]
+
+    filename = f"report_{period}_{now.strftime('%Y%m%d_%H%M%S')}"
+
+    if export_format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        for row in report_data:
+            writer.writerow(row)
+        output.seek(0)
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}.csv"}
+        )
+
+    elif export_format == "excel":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        for row in report_data:
+            writer.writerow(row)
+        output.seek(0)
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="application/vnd.ms-excel",
+            headers={"Content-Disposition": f"attachment; filename={filename}.xls"}
+        )
+
+    elif export_format == "pdf":
+        rows = [f"{label}: {val}" if label else "" for label, val in report_data]
+        pdf_bytes = generate_pdf(f"TradeX {report_label}", rows)
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}.pdf"}
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Invalid format")
+
+
+@router.get("/reports/history")
+def list_report_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+
+    from app.models.report_history import ReportHistory
+    import json
+    
+    history = db.query(ReportHistory).order_by(ReportHistory.generated_at.desc()).all()
+    
+    result = []
+    for h in history:
+        result.append({
+            "id": h.id,
+            "report_type": h.report_type,
+            "start_date": h.start_date.isoformat(),
+            "end_date": h.end_date.isoformat(),
+            "generated_by": h.generated_by,
+            "generated_at": h.generated_at.isoformat(),
+            "metrics": json.loads(h.metrics_data)
+        })
+        
+    return result
+
+
+@router.get("/market-overview")
+def get_market_overview(
+    period: str = "today", # today, week, month, custom
+    start_date: str = None,
+    end_date: str = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+
+    from app.models.trade import Trade
+    from app.models.stock import Stock
+    from collections import defaultdict
+
+    now = datetime.utcnow()
+    
+    if period == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now
+    elif period == "week":
+        start = now - timedelta(days=7)
+        end = now
+    elif period == "month":
+        start = now - timedelta(days=30)
+        end = now
+    elif period == "custom":
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="Start date and end date are required for custom period")
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, microsecond=999999)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    else:
+        raise HTTPException(status_code=400, detail="Invalid period. Must be today, week, month, or custom")
+
+    # Fetch trades and stocks
+    trades = db.query(Trade).filter(Trade.created_at >= start, Trade.created_at <= end).all()
+    stocks = db.query(Stock).all()
+    stock_map = {s.id: s for s in stocks}
+
+    # Summary Metrics
+    total_trades = len(trades)
+    total_volume = sum(t.price * t.quantity for t in trades)
+    total_profit = sum(t.price * t.quantity for t in trades if t.trade_type == "SELL")
+    total_loss = sum(t.price * t.quantity for t in trades if t.trade_type == "BUY")
+
+    # 1. Most Traded Stocks
+    stock_groups = defaultdict(lambda: {"count": 0, "volume": 0.0, "symbol": "", "company_name": ""})
+    for t in trades:
+        stock = stock_map.get(t.stock_id)
+        if stock:
+            stock_groups[t.stock_id]["count"] += 1
+            stock_groups[t.stock_id]["volume"] += t.price * t.quantity
+            stock_groups[t.stock_id]["symbol"] = stock.symbol
+            stock_groups[t.stock_id]["company_name"] = stock.company_name
+
+    most_traded = sorted(stock_groups.values(), key=lambda x: x["volume"], reverse=True)[:5]
+
+    # 2. Top Gainers & Losers (percentage change current vs previous close)
+    gainers_losers = []
+    for s in stocks:
+        pct = 0.0
+        if s.previous_close and s.previous_close > 0:
+            pct = ((s.current_price - s.previous_close) / s.previous_close) * 100
+        gainers_losers.append({
+            "id": s.id,
+            "symbol": s.symbol,
+            "company_name": s.company_name,
+            "current_price": s.current_price,
+            "previous_close": s.previous_close,
+            "change_percent": round(pct, 2)
+        })
+
+    top_gainers = sorted([x for x in gainers_losers if x["change_percent"] > 0], key=lambda x: x["change_percent"], reverse=True)[:5]
+    top_losers = sorted([x for x in gainers_losers if x["change_percent"] < 0], key=lambda x: x["change_percent"])[:5]
+
+    # 3. Trading Volume Over Time (daily buckets)
+    volume_by_day = defaultdict(float)
+    current_day = start.date()
+    end_day = end.date()
+    while current_day <= end_day:
+        volume_by_day[current_day.strftime("%Y-%m-%d")] = 0.0
+        current_day += timedelta(days=1)
+
+    for t in trades:
+        day_str = t.created_at.strftime("%Y-%m-%d")
+        if day_str in volume_by_day:
+            volume_by_day[day_str] += t.price * t.quantity
+
+    trading_volume_chart = [{"date": k, "volume": v} for k, v in sorted(volume_by_day.items())]
+
+    # 4. Daily Profit/Loss (SELLs vs BUYs)
+    pl_by_day = defaultdict(float)
+    current_day = start.date()
+    while current_day <= end_day:
+        pl_by_day[current_day.strftime("%Y-%m-%d")] = 0.0
+        current_day += timedelta(days=1)
+
+    for t in trades:
+        day_str = t.created_at.strftime("%Y-%m-%d")
+        if day_str in pl_by_day:
+            val = t.price * t.quantity if t.trade_type == "SELL" else -t.price * t.quantity
+            pl_by_day[day_str] += val
+
+    daily_pl_chart = [{"date": k, "pl": v} for k, v in sorted(pl_by_day.items())]
+
+    return {
+        "summary": {
+            "total_trades": total_trades,
+            "total_volume": float(total_volume),
+            "total_profit": float(total_profit),
+            "total_loss": float(total_loss)
+        },
+        "most_traded": most_traded,
+        "top_gainers": top_gainers,
+        "top_losers": top_losers,
+        "trading_volume_chart": trading_volume_chart,
+        "daily_pl_chart": daily_pl_chart
+    }
+
+
+@router.get("/settings")
+def get_settings(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from app.models.system_setting import SystemSetting
+
+    defaults = {
+        "trading_start_time": "09:00",
+        "trading_end_time": "17:00",
+        "otp_expiry_seconds": "300",
+        "min_deposit_amount": "100.0",
+        "min_withdrawal_amount": "500.0",
+        "maintenance_mode": "false",
+        "maintenance_title": "System Under Maintenance",
+        "maintenance_message": "We are currently performing scheduled maintenance. Please check back later.",
+        "maintenance_eta": "2 hours",
+        "email_sender": "adminn.tradex@gmail.com",
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": "587",
+        "smtp_username": "adminn.tradex@gmail.com",
+        "smtp_password": "your-smtp-password",
+        "gemini_api_key": "your-gemini-key",
+        "openai_api_key": "your-openai-key"
+    }
+
+    # Ensure all default settings exist in the database
+    for k, v in defaults.items():
+        existing = db.query(SystemSetting).filter(SystemSetting.key == k).first()
+        if not existing:
+            setting = SystemSetting(key=k, value=v)
+            db.add(setting)
+    db.commit()
+
+    # Query all settings
+    all_settings = db.query(SystemSetting).all()
+    
+    settings_dict = {}
+    for s in all_settings:
+        val = s.value
+        # Mask sensitive keys
+        if s.key in ["smtp_password", "gemini_api_key", "openai_api_key"] and val:
+            val = "********"
+        settings_dict[s.key] = val
+
+    return settings_dict
+
+
+@router.post("/settings")
+def update_settings(
+    payload: dict,
+    request: Request = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from app.models.system_setting import SystemSetting, SettingHistory
+
+    # Validate inputs
+    trading_start = payload.get("trading_start_time", "").strip()
+    trading_end = payload.get("trading_end_time", "").strip()
+    
+    if trading_start:
+        try:
+            datetime.strptime(trading_start, "%H:%M")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid trading start time format. Use HH:MM")
+
+    if trading_end:
+        try:
+            datetime.strptime(trading_end, "%H:%M")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid trading end time format. Use HH:MM")
+
+    otp_expiry = payload.get("otp_expiry_seconds")
+    if otp_expiry is not None:
+        try:
+            val = int(otp_expiry)
+            if val <= 0:
+                raise ValueError()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="OTP Expiry must be a positive integer in seconds")
+
+    min_dep = payload.get("min_deposit_amount")
+    if min_dep is not None:
+        try:
+            val = float(min_dep)
+            if val < 0:
+                raise ValueError()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Minimum Deposit must be a positive number")
+
+    min_with = payload.get("min_withdrawal_amount")
+    if min_with is not None:
+        try:
+            val = float(min_with)
+            if val < 0:
+                raise ValueError()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Minimum Withdrawal must be a positive number")
+
+    smtp_port = payload.get("smtp_port")
+    if smtp_port is not None:
+        try:
+            val = int(smtp_port)
+            if val <= 0:
+                raise ValueError()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="SMTP Port must be a positive integer")
+
+    maintenance_changed = False
+    maintenance_is_on = False
+
+    # Update settings
+    for k, v in payload.items():
+        if v is None:
+            continue
+            
+        str_val = str(v).strip()
+        
+        # Skip updating if it is a masked value
+        if k in ["smtp_password", "gemini_api_key", "openai_api_key"] and str_val == "********":
+            continue
+
+        setting = db.query(SystemSetting).filter(SystemSetting.key == k).first()
+        if setting:
+            old_val = setting.value
+            if old_val != str_val:
+                setting.value = str_val
+                if k == "maintenance_mode":
+                    maintenance_changed = True
+                    maintenance_is_on = str_val.lower() == "true"
+                
+                # Log change in history
+                history = SettingHistory(
+                    setting_key=k,
+                    old_value=old_val,
+                    new_value=str_val,
+                    changed_by=current_user.email
+                )
+                db.add(history)
+        else:
+            # Create new setting
+            new_setting = SystemSetting(key=k, value=str_val)
+            db.add(new_setting)
+            if k == "maintenance_mode":
+                maintenance_changed = True
+                maintenance_is_on = str_val.lower() == "true"
+            
+            history = SettingHistory(
+                setting_key=k,
+                old_value=None,
+                new_value=str_val,
+                changed_by=current_user.email
+            )
+            db.add(history)
+
+    db.commit()
+
+    if maintenance_changed:
+        try:
+            from app.core.email import send_maintenance_mode_email
+            send_maintenance_mode_email(maintenance_is_on)
+        except Exception as e:
+            print(f"Failed to send maintenance mode email: {e}")
+    
+    log_audit(db, current_user.id, "Update System Settings", "Updated application-wide configurations", request.client.host if (request and request.client) else None)
+
+    return {"message": "System settings updated successfully"}
+
+
+@router.get("/settings/history")
+def get_settings_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from app.models.system_setting import SettingHistory
+
+    history = db.query(SettingHistory).order_by(SettingHistory.changed_at.desc()).all()
+    
+    result = []
+    for h in history:
+        # Hide sensitive values in history
+        old_val = h.old_value
+        new_val = h.new_value
+        if h.setting_key in ["smtp_password", "gemini_api_key", "openai_api_key"]:
+            if old_val:
+                old_val = "********"
+            if new_val:
+                new_val = "********"
+                
+        result.append({
+            "id": h.id,
+            "setting_key": h.setting_key,
+            "old_value": old_val,
+            "new_value": new_val,
+            "changed_by": h.changed_by,
+            "changed_at": h.changed_at.isoformat()
+        })
+        
+    return result
 
 

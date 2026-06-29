@@ -28,6 +28,9 @@ from app.models.user_session import UserSession
 from app.models.login_history import LoginHistory
 from app.models.chat_history import ChatHistory
 from app.models.price_alert import PriceAlert
+from app.models.report_history import ReportHistory
+from app.models.system_setting import SystemSetting, SettingHistory
+from app.models.feedback import Feedback
 from app.seed_stocks import seed_stocks
 from app.core.email import send_auto_trade_email
 from app.core.notifications import create_notification
@@ -49,6 +52,7 @@ from app.api.ai import router as ai_router
 from app.api.alerts import router as alerts_router
 from app.api.risk import router as risk_router
 from app.api.websocket import router as websocket_router
+from app.api.feedback import router as feedback_router
 
 # Create Tables
 Base.metadata.create_all(bind=engine)
@@ -520,6 +524,10 @@ origins = [
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+    "http://localhost:5176",
+    "http://127.0.0.1:5176",
     "https://tradex-frontend-mfxa.onrender.com",
 ]
 
@@ -546,6 +554,7 @@ app.include_router(ai_router)
 app.include_router(alerts_router)
 app.include_router(risk_router)
 app.include_router(websocket_router)
+app.include_router(feedback_router)
 
 start_price_worker_once()
 start_alert_worker_once()

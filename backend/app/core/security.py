@@ -256,6 +256,32 @@ def get_current_user(
         db,
         request
     )
+    
+    # Check if maintenance mode is active
+    from app.models.system_setting import SystemSetting
+    import json
+    try:
+        maintenance_setting = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_mode").first()
+        if maintenance_setting and maintenance_setting.value == "true" and not user.is_admin:
+            title = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_title").first()
+            msg = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_message").first()
+            eta = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_eta").first()
+            
+            detail_msg = {
+                "error": "maintenance",
+                "title": title.value if title else "System Under Maintenance",
+                "message": msg.value if msg else "We are currently performing scheduled maintenance. Please check back later.",
+                "eta": eta.value if eta else "Shortly"
+            }
+            raise HTTPException(
+                status_code=503,
+                detail=json.dumps(detail_msg)
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
     return user
 
 

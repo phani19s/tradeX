@@ -61,6 +61,12 @@ def decode_withdrawal_action_token(token: str):
 
 def decode_ticket_action_token(token: str):
     return decode_action_token(token)
+
+def create_maintenance_action_token(action: str):
+    return create_action_token(0, action, "maintenance")
+
+def decode_maintenance_action_token(token: str):
+    return decode_action_token(token)
 ...
 def send_withdrawal_approval_email(
     user_email: str,
@@ -960,3 +966,92 @@ def send_price_alert_email(
     </html>
     """
     _send_html_email(recipient_email, subject, html)
+
+
+def send_maintenance_mode_email(is_on: bool):
+    from app.core.database import SessionLocal
+    from app.models.system_setting import SystemSetting
+    
+    db = SessionLocal()
+    try:
+        # Load SMTP settings dynamically from DB
+        sender = db.query(SystemSetting).filter(SystemSetting.key == "email_sender").first()
+        server_host = db.query(SystemSetting).filter(SystemSetting.key == "smtp_server").first()
+        port_num = db.query(SystemSetting).filter(SystemSetting.key == "smtp_port").first()
+        user_name = db.query(SystemSetting).filter(SystemSetting.key == "smtp_username").first()
+        password_val = db.query(SystemSetting).filter(SystemSetting.key == "smtp_password").first()
+        
+        from_email = sender.value if (sender and sender.value) else "tradex.adminn@gmail.com"
+        if is_on:
+            from_email = "tradex.support@gmail.com"
+            
+        smtp_host = server_host.value if (server_host and server_host.value) else "smtp.gmail.com"
+        smtp_port = int(port_num.value) if (port_num and port_num.value) else 587
+        smtp_user = user_name.value if (user_name and user_name.value) else "tradex.adminn@gmail.com"
+        smtp_pass = password_val.value if (password_val and password_val.value) else ""
+        
+        if not smtp_pass or smtp_pass in ["your-smtp-password", "********"]:
+            smtp_user = EMAIL_ADDRESS or "tradex.support@gmail.com"
+            smtp_pass = EMAIL_PASSWORD or ""
+            smtp_host = "smtp.gmail.com"
+            smtp_port = 587
+            
+        status_text = "ACTIVATED" if is_on else "DEACTIVATED"
+        subject = f"TradeX Alert: Maintenance Mode {status_text}"
+        
+        button_html = ""
+        if is_on:
+            token = create_maintenance_action_token("deactivate")
+            deactivate_link = f"{API_BASE_URL}/admin/maintenance/email/deactivate?token={token}"
+            button_html = f"""
+            <div style="text-align:center;margin:30px 0;">
+              <a href="{deactivate_link}" style="background-color:#ef4444;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;display:inline-block;box-shadow:0 4px 12px rgba(239,68,68,0.25);">Turn Off Maintenance Mode</a>
+            </div>
+            """
+
+        body = f"""
+        <html>
+        <body style="font-family:Arial,sans-serif;background:#f5f7fa;padding:20px;">
+          <div style="max-width:600px;margin:auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 12px rgba(0,0,0,.1);">
+            <h1 style="color:#f43f5e;text-align:center;">TradeX System Alert</h1>
+            <h2 style="text-align:center;color:#333;">Maintenance Mode {status_text}</h2>
+            <p>Hello Administrator,</p>
+            <p>This is to notify you that Maintenance Mode has been successfully <strong>{status_text.lower()}</strong> in the TradeX Admin Settings.</p>
+            <p><strong>Status:</strong> {status_text}</p>
+            <p><strong>Timestamp:</strong> {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
+            {button_html}
+            <hr>
+            <p style="text-align:center;color:#666;">TradeX Admin Notification Services</p>
+          </div>
+        </body>
+        </html>
+        """
+        
+        msg = MIMEText(body, "html")
+        msg["Subject"] = subject
+        msg["From"] = from_email
+        msg["To"] = "tradex.adminn@gmail.com"
+        
+        # Connect and send
+        import smtplib
+        import ssl
+        
+        context = ssl.create_default_context()
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=20)
+        else:
+            server = smtplib.SMTP(smtp_host, smtp_port, timeout=20)
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            
+        if smtp_user and smtp_pass and smtp_pass != "********":
+            server.login(smtp_user, smtp_pass)
+            
+        server.sendmail(from_email, "tradex.adminn@gmail.com", msg.as_string())
+        server.quit()
+        print("Maintenance Mode email notification sent to tradex.adminn@gmail.com successfully.")
+    except Exception as e:
+        print(f"Failed to send maintenance mode email notification: {e}")
+    finally:
+        db.close()

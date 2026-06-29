@@ -7,7 +7,7 @@ function Toggle({ active, onClick }) {
       type="button"
       onClick={onClick}
       className={`relative h-6 w-12 rounded-full transition-colors ${
-        active ? "bg-blue-600" : "bg-slate-400"
+        active ? "bg-green-600" : "bg-slate-400"
       }`}
       aria-pressed={active}
     >

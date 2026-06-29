@@ -21,6 +21,18 @@ api.interceptors.response.use(
       
       // Always reject so components don't hang in a loading state
     }
+    if (error.response && error.response.status === 503) {
+      try {
+        const detail = error.response.data?.detail;
+        if (detail && typeof detail === "string" && detail.includes("maintenance")) {
+          if (window.location.pathname !== "/maintenance") {
+            window.location.href = "/maintenance";
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
     return Promise.reject(error);
   }
 );

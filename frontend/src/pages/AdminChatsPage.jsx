@@ -30,6 +30,7 @@ function AdminChatsPage() {
       const res = await api.get("/support/admin/chat/users", getAuthHeaders());
       console.log("AdminChatsPage: Fetched chat users successfully", res.data);
       setUsers(res.data);
+      window.dispatchEvent(new Event("tradex_chats_updated"));
     } catch (error) {
       console.error("AdminChatsPage: Failed to fetch chat users:", error);
       toast.error("Failed to load active chats");

@@ -23,14 +23,21 @@ import Alerts from "./pages/Alerts";
 import RiskDashboard from "./pages/RiskDashboard";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminAdminsPage from "./pages/AdminAdminsPage";
-import AdminTicketsPage from "./pages/AdminTicketsPage";
-import AdminChatsPage from "./pages/AdminChatsPage";
+import AdminSupportPage from "./pages/AdminSupportPage";
 import AdminTradingPage from "./pages/AdminTradingPage";
 import AdminStocksPage from "./pages/AdminStocksPage";
+import AdminReportsPage from "./pages/AdminReportsPage";
+import AdminMarketPage from "./pages/AdminMarketPage";
+import AdminSettingsPage from "./pages/AdminSettingsPage";
+import MaintenancePage from "./pages/MaintenancePage";
+import MaintenanceGuard from "./components/MaintenanceGuard";
+import Feedback from "./pages/Feedback";
+import AdminFeedbackPage from "./pages/AdminFeedbackPage";
 
 function App() {
   return (
     <BrowserRouter>
+      <MaintenanceGuard />
       {/* Global Session Timeout Monitor (15 Minutes) */}
       <SessionTimeout timeoutMinutes={15} />
 
@@ -111,18 +118,38 @@ function App() {
         />
 
         <Route
-          path="/admin/tickets"
-          element={<AdminTicketsPage />}
+          path="/admin/support"
+          element={<AdminSupportPage />}
         />
 
         <Route
-          path="/admin/chats"
-          element={<AdminChatsPage />}
+          path="/admin/market"
+          element={<AdminMarketPage />}
         />
 
         <Route
           path="/admin/stocks"
           element={<AdminStocksPage />}
+        />
+
+        <Route
+          path="/admin/reports"
+          element={<AdminReportsPage />}
+        />
+
+        <Route
+          path="/admin/settings"
+          element={<AdminSettingsPage />}
+        />
+
+        <Route
+          path="/admin/feedback"
+          element={<AdminFeedbackPage />}
+        />
+
+        <Route
+          path="/feedback"
+          element={<Feedback />}
         />
 
         <Route
@@ -148,6 +175,11 @@ function App() {
         <Route
           path="/login-history"
           element={<LoginHistory />}
+        />
+
+        <Route
+          path="/maintenance"
+          element={<MaintenancePage />}
         />
 
       </Routes>
