@@ -8,6 +8,7 @@ import {
 } from "react-toastify";
 
 import tradingBg from "../assets/trading-bg.jpg";
+import ActiveBanners from "../components/ActiveBanners";
 
 function Login() {
 
@@ -225,6 +226,10 @@ return (
       />
 
     </svg>
+
+    <div className="w-[450px] z-10 max-w-full">
+      <ActiveBanners />
+    </div>
 
     {/* Login Card */}
 

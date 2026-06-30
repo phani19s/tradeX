@@ -31,6 +31,8 @@ from app.models.price_alert import PriceAlert
 from app.models.report_history import ReportHistory
 from app.models.system_setting import SystemSetting, SettingHistory
 from app.models.feedback import Feedback
+from app.models.banner import Banner
+from app.models.holiday import MarketHoliday
 from app.seed_stocks import seed_stocks
 from app.core.email import send_auto_trade_email
 from app.core.notifications import create_notification
@@ -469,6 +471,34 @@ def ensure_security_tracking_columns():
             )
 
 
+def ensure_audit_log_columns():
+    inspector = inspect(engine)
+    if "admin_audit_logs" in inspector.get_table_names():
+        columns = [column["name"] for column in inspector.get_columns("admin_audit_logs")]
+        with engine.begin() as connection:
+            if "module" not in columns:
+                connection.exec_driver_sql("ALTER TABLE admin_audit_logs ADD COLUMN module VARCHAR")
+            if "device_browser" not in columns:
+                connection.exec_driver_sql("ALTER TABLE admin_audit_logs ADD COLUMN device_browser VARCHAR")
+            if "status" not in columns:
+                connection.exec_driver_sql("ALTER TABLE admin_audit_logs ADD COLUMN status VARCHAR NOT NULL DEFAULT 'Success'")
+
+            # Backfill existing logs with correct modules
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Authentication' WHERE (LOWER(action) LIKE '%%login%%' OR LOWER(action) LIKE '%%logout%%') AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Deposits' WHERE LOWER(action) LIKE '%%deposit%%' AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Withdrawals' WHERE LOWER(action) LIKE '%%withdrawal%%' AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'User Management' WHERE (LOWER(action) LIKE '%%user%%' OR LOWER(action) LIKE '%%password%%') AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Admin Management' WHERE (LOWER(action) LIKE '%%admin%%' OR LOWER(action) LIKE '%%permission%%') AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Stock Management' WHERE LOWER(action) LIKE '%%stock%%' AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'System Settings' WHERE LOWER(action) LIKE '%%setting%%' AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Support' WHERE (LOWER(action) LIKE '%%ticket%%' OR LOWER(action) LIKE '%%chat%%' OR LOWER(action) LIKE '%%reply%%') AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Reports' WHERE LOWER(action) LIKE '%%report%%' AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Maintenance' WHERE LOWER(action) LIKE '%%maintenance%%' AND (module IS NULL OR module = 'Other')")
+            connection.exec_driver_sql("UPDATE admin_audit_logs SET module = 'Other' WHERE module IS NULL")
+
+
+
+
 app = FastAPI(
     title="TradeX API"
 )
@@ -483,6 +513,7 @@ ensure_stock_columns()
 ensure_withdrawal_columns()
 ensure_trade_columns()
 ensure_security_tracking_columns()
+ensure_audit_log_columns()
 seed_admin_user()
 seed_stocks()
 

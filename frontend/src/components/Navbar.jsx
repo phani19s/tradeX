@@ -139,23 +139,29 @@ function Navbar() {
             <Link to="/admin/administrators" {...linkStyle("/admin/administrators")}>
               Admins
             </Link>
+            <Link to="/admin/stocks" {...linkStyle("/admin/stocks")}>
+              Stocks
+            </Link>
+            <Link to="/admin/content-market" {...linkStyle("/admin/content-market")}>
+              Holidays
+            </Link>
             <Link to="/admin/trading" {...linkStyle("/admin/trading")}>
               Monitor
             </Link>
             <Link to="/admin/support" {...linkStyle("/admin/support")}>
               Support {unreadChats > 0 && <span className="ml-1 text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full">{unreadChats}</span>}
             </Link>
-            <Link to="/admin/stocks" {...linkStyle("/admin/stocks")}>
-              Stocks
+            <Link to="/admin/analytics" {...linkStyle("/admin/analytics")}>
+              Analytics
             </Link>
-            <Link to="/admin/reports" {...linkStyle("/admin/reports")}>
-              Reports
+            <Link to="/admin/audit-logs" {...linkStyle("/admin/audit-logs")}>
+              Audit Logs
             </Link>
             <Link to="/admin/settings" {...linkStyle("/admin/settings")}>
               Settings
             </Link>
-            <Link to="/admin/feedback" {...linkStyle("/admin/feedback")}>
-              Feedback
+            <Link to="/admin/backup-restore" {...linkStyle("/admin/backup-restore")}>
+              Backup & Restore
             </Link>
           </>
         )}
@@ -165,29 +171,29 @@ function Navbar() {
             <Link to="/portfolio" {...linkStyle("/portfolio")}>
               Portfolio
             </Link>
-
             <Link to="/watchlist" {...linkStyle("/watchlist")}>
               Watchlist
             </Link>
-
             <Link to="/trade" {...linkStyle("/trade")}>
               Trade
             </Link>
-
             <Link to="/history" {...linkStyle("/history")}>
               History
             </Link>
-
-            <Link to="/ai-assistant" {...linkStyle("/ai-assistant")}>
-              AI Assistant
-            </Link>
-
             <Link to="/alerts" {...linkStyle("/alerts")}>
               Alerts
             </Link>
-
+            <Link to="/market-insights" {...linkStyle("/market-insights")}>
+              Insights
+            </Link>
             <Link to="/risk-dashboard" {...linkStyle("/risk-dashboard")}>
               Risk
+            </Link>
+            <Link to="/ai-assistant" {...linkStyle("/ai-assistant")}>
+              AI Assistant
+            </Link>
+            <Link to="/market-holidays" {...linkStyle("/market-holidays")}>
+              Holidays
             </Link>
             <Link to="/feedback" {...linkStyle("/feedback")}>
               Feedback

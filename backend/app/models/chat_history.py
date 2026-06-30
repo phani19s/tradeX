@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
-
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 
@@ -13,3 +13,5 @@ class ChatHistory(Base):
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")

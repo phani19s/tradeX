@@ -86,7 +86,8 @@ function Watchlist() {
 
   const watchlistCount = watchlist.length;
   const availableCount = stockOptions.length;
-  const canAdd = Boolean(stockId);
+  const selectedStock = stockOptions.find(stock => String(stock.id) === String(stockId));
+  const canAdd = Boolean(stockId) && Boolean(selectedStock?.is_active);
 
   const mergedWatchlist = watchlist.map(item => {
     const liveStock = stockOptions.find(s => s.id === item.stock_id);
@@ -198,8 +199,8 @@ function Watchlist() {
               >
                 <option value="">Select Stock</option>
                 {stockOptions.map((stock) => (
-                  <option key={stock.id} value={stock.id}>
-                    {stock.symbol} - {stock.company_name}
+                  <option key={stock.id} value={stock.id} disabled={!stock.is_active}>
+                    {stock.symbol} - {stock.company_name} {!stock.is_active ? "(Inactive)" : ""}
                   </option>
                 ))}
               </select>
@@ -258,10 +259,13 @@ function Watchlist() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div
-                          className="inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em]"
-                          style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${
+                            stock.is_active
+                              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-500"
+                              : "border-rose-500/25 bg-rose-500/10 text-rose-500"
+                          }`}
                         >
-                          Watchlist
+                          {stock.is_active ? "Active" : "Inactive"}
                         </div>
                         <h3 className="mt-3 text-2xl font-black">{stock.symbol}</h3>
                         <p className="mt-1 text-sm opacity-70">{stock.company_name}</p>

@@ -10,6 +10,7 @@ import PaymentModal from "../components/PaymentModal";
 import WithdrawModal from "../components/WithdrawModal";
 import RaiseTicketModal from "../components/RaiseTicketModal";
 import { useStocks } from "../context/StockContext";
+import ActiveBanners from "../components/ActiveBanners";
 
 function formatMoney(value) {
   return new Intl.NumberFormat("en-IN", {
@@ -46,6 +47,7 @@ function Dashboard() {
   const { stocks } = useStocks();
   const navigate = useNavigate();
   const location = useLocation();
+
 
   useEffect(() => {
     if (isAdmin) {
@@ -206,6 +208,7 @@ function Dashboard() {
       <Navbar />
 
       <div className="theme-main px-4 py-6 md:px-6">
+        <ActiveBanners />
         <div
           className="mb-6 rounded-[28px] border p-6 shadow-xl"
           style={{
@@ -248,6 +251,8 @@ function Dashboard() {
             </div>
           </div>
         </div>
+
+
 
         {data && (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -297,6 +302,7 @@ function Dashboard() {
               const up =
                 Number(stock.current_price) >
                 Number(stock.previous_close);
+              const isDisabled = !stock.is_active;
               
               const change =
                 (
@@ -319,13 +325,20 @@ function Dashboard() {
                     background:
                       "var(--surface)",
                     borderColor:
-                      "var(--border)"
+                      isDisabled ? "color-mix(in srgb, #f43f5e 45%, var(--border))" : "var(--border)",
+                    opacity: isDisabled ? 0.6 : 1
                   }}
                 >
-        
-                  <h3 className="font-bold text-lg">
-                    {stock.symbol}
-                  </h3>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-bold text-lg">
+                      {stock.symbol}
+                    </h3>
+                    {isDisabled && (
+                      <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-rose-500">
+                        Disabled
+                      </span>
+                    )}
+                  </div>
         
                   <p className="opacity-70 text-sm">
                     {stock.name}

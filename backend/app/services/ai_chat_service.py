@@ -135,7 +135,7 @@ def _fallback_answer(context):
 
 def _call_openai(prompt):
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    if not api_key or len(api_key.strip()) < 10 or api_key.startswith("your_") or "placeholder" in api_key.lower() or "dummy" in api_key.lower():
         return None
 
     response = requests.post(
@@ -153,7 +153,7 @@ def _call_openai(prompt):
             "temperature": 0.3,
             "max_tokens": 250,
         },
-        timeout=20,
+        timeout=3,
     )
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"].strip()
@@ -161,7 +161,7 @@ def _call_openai(prompt):
 
 def _call_gemini(prompt):
     api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
+    if not api_key or len(api_key.strip()) < 10 or api_key.startswith("your_") or "placeholder" in api_key.lower() or "dummy" in api_key.lower():
         return None
 
     model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
@@ -176,7 +176,7 @@ def _call_gemini(prompt):
                 }
             ]
         },
-        timeout=20,
+        timeout=3,
     )
     response.raise_for_status()
     candidates = response.json().get("candidates", [])

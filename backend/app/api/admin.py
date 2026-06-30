@@ -12,7 +12,7 @@ from app.schemas.stock import StockCreate, StockUpdate, StockResponse
 
 import os
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.dependencies import get_db
 from app.core.security import get_current_user
@@ -40,13 +40,75 @@ router = APIRouter(
 FRONTEND_URL = os.getenv("TRADEX_FRONTEND_URL", "http://localhost:5173")
 
 
-def log_audit(db: Session, admin_id: int, action: str, details: str, ip_address: str = None):
+def log_audit(
+    db: Session,
+    admin_id: int,
+    action: str,
+    details: str,
+    ip_address: str = None,
+    module: str = None,
+    status: str = "Success",
+    request: Request = None
+):
     try:
         from app.models.audit_log import AdminAuditLog
-        db.add(AdminAuditLog(admin_id=admin_id, action=action, details=details, ip_address=ip_address))
+        
+        if not module:
+            action_lower = action.lower()
+            if "deposit" in action_lower:
+                module = "Deposits"
+            elif "withdrawal" in action_lower:
+                module = "Withdrawals"
+            elif "user" in action_lower or "password" in action_lower or "logout" in action_lower or "login" in action_lower:
+                module = "User Management"
+            elif "admin" in action_lower or "permission" in action_lower:
+                module = "Admin Management"
+            elif "stock" in action_lower:
+                module = "Stock Management"
+            elif "setting" in action_lower:
+                module = "System Settings"
+            elif "ticket" in action_lower or "chat" in action_lower or "reply" in action_lower:
+                module = "Support"
+            elif "report" in action_lower:
+                module = "Reports"
+            elif "maintenance" in action_lower:
+                module = "Maintenance"
+            else:
+                module = "Other"
+                
+        device_browser = "Unknown"
+        if request:
+            user_agent = request.headers.get("user-agent", "")
+            if user_agent:
+                browser = "Other"
+                if "Chrome" in user_agent: browser = "Chrome"
+                elif "Firefox" in user_agent: browser = "Firefox"
+                elif "Safari" in user_agent: browser = "Safari"
+                elif "Edge" in user_agent: browser = "Edge"
+                elif "MSIE" in user_agent or "Trident" in user_agent: browser = "IE"
+                
+                os_name = "Other"
+                if "Windows" in user_agent: os_name = "Windows"
+                elif "Macintosh" in user_agent: os_name = "macOS"
+                elif "Linux" in user_agent: os_name = "Linux"
+                elif "Android" in user_agent: os_name = "Android"
+                elif "iPhone" in user_agent: os_name = "iOS"
+                
+                device_browser = f"{browser} / {os_name}"
+
+        db.add(AdminAuditLog(
+            admin_id=admin_id,
+            action=action,
+            module=module,
+            details=details,
+            ip_address=ip_address,
+            device_browser=device_browser,
+            status=status
+        ))
         db.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print("Failed to log audit action:", e)
+
 
 
 def _apply_deposit_approval(
@@ -121,20 +183,25 @@ def list_users(
 
     total = query.count()
     offset = (page - 1) * limit
-    users = query.order_by(User.created_at.desc()).offset(offset).limit(limit).all()
+    users = query.options(joinedload(User.portfolio)).order_by(User.created_at.desc()).offset(offset).limit(limit).all()
+
+    user_ids = [u.id for u in users]
+    login_map = {}
+    if user_ids:
+        from sqlalchemy import func
+        from app.models.login_history import LoginHistory
+        last_logins = (
+            db.query(LoginHistory.user_id, func.max(LoginHistory.login_time).label("max_login"))
+            .filter(LoginHistory.user_id.in_(user_ids), LoginHistory.status == "Success")
+            .group_by(LoginHistory.user_id)
+            .all()
+        )
+        login_map = {uid: max_login.isoformat() for uid, max_login in last_logins}
 
     result = []
     for user in users:
-        portfolio = db.query(Portfolio).filter(Portfolio.user_id == user.id).first()
-        balance = portfolio.balance if portfolio else 0.0
-
-        last_login_record = (
-            db.query(LoginHistory)
-            .filter(LoginHistory.user_id == user.id, LoginHistory.status == "Success")
-            .order_by(LoginHistory.login_time.desc())
-            .first()
-        )
-        last_login = last_login_record.login_time.isoformat() if last_login_record else None
+        balance = user.portfolio.balance if user.portfolio else 0.0
+        last_login = login_map.get(user.id)
 
         result.append({
             "id": user.id,
@@ -179,16 +246,17 @@ def list_deposits(
 
     deposits = (
         db.query(Deposit)
+        .options(
+            joinedload(Deposit.user),
+            joinedload(Deposit.created_by),
+            joinedload(Deposit.verified_by)
+        )
         .order_by(Deposit.created_at.desc())
         .all()
     )
 
     items = []
     for deposit in deposits:
-        target_user = db.query(User).filter(User.id == deposit.user_id).first()
-        created_by = db.query(User).filter(User.id == deposit.created_by_id).first()
-        verified_by = db.query(User).filter(User.id == deposit.verified_by_id).first()
-
         items.append(
             {
                 "id": deposit.id,
@@ -197,9 +265,9 @@ def list_deposits(
                 "status": deposit.status,
                 "created_at": deposit.created_at.isoformat(),
                 "verified_at": deposit.verified_at.isoformat() if deposit.verified_at else None,
-                "target_email": target_user.email if target_user else None,
-                "created_by_email": created_by.email if created_by else None,
-                "verified_by_email": verified_by.email if verified_by else None,
+                "target_email": deposit.user.email if deposit.user else None,
+                "created_by_email": deposit.created_by.email if deposit.created_by else None,
+                "verified_by_email": deposit.verified_by.email if deposit.verified_by else None,
             }
         )
 
@@ -1038,6 +1106,84 @@ def view_user_details(
     }
 
 
+@router.get("/users/{user_id}/activity")
+def get_user_activity(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin or current_user.role not in ["Administrator", "Super Administrator"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Get all trades
+    from app.models.trade import Trade
+    trades = db.query(Trade).options(joinedload(Trade.stock)).filter(Trade.user_id == user_id).order_by(Trade.created_at.desc()).all()
+    trades_list = [{
+        "id": t.id,
+        "stock_symbol": t.stock.symbol if t.stock else "Unknown",
+        "stock_name": t.stock.company_name if t.stock else "Unknown",
+        "trade_type": t.trade_type,
+        "quantity": t.quantity,
+        "price": t.price,
+        "created_at": t.created_at.isoformat()
+    } for t in trades]
+    
+    # Get all deposits
+    from app.models.deposit import Deposit
+    deposits = db.query(Deposit).filter(Deposit.user_id == user_id).order_by(Deposit.created_at.desc()).all()
+    deposits_list = [{
+        "id": d.id,
+        "amount": d.amount,
+        "payment_type": d.payment_type,
+        "utr_number": d.utr_number,
+        "status": d.status,
+        "created_at": d.created_at.isoformat()
+    } for d in deposits]
+    
+    # Get all withdrawals
+    from app.models.withdrawal import Withdrawal
+    withdrawals = db.query(Withdrawal).filter(Withdrawal.user_id == user_id).order_by(Withdrawal.created_at.desc()).all()
+    withdrawals_list = [{
+        "id": w.id,
+        "amount": w.amount,
+        "status": w.status,
+        "created_at": w.created_at.isoformat()
+    } for w in withdrawals]
+    
+    # Get watchlist
+    from app.models.watchlist import Watchlist
+    from app.models.stock import Stock
+    watchlist = db.query(Watchlist, Stock).join(Stock, Watchlist.stock_id == Stock.id).filter(Watchlist.user_id == user_id).all()
+    watchlist_list = [{
+        "stock_symbol": s.symbol,
+        "stock_name": s.company_name,
+        "current_price": s.current_price
+    } for _, s in watchlist]
+    
+    # Get support tickets
+    from app.models.support import SupportTicket
+    tickets = db.query(SupportTicket).filter(SupportTicket.user_id == user_id).order_by(SupportTicket.created_at.desc()).all()
+    tickets_list = [{
+        "id": tk.id,
+        "ticket_number": tk.ticket_number,
+        "issue_type": tk.issue_type,
+        "status": tk.status,
+        "created_at": tk.created_at.isoformat()
+    } for tk in tickets]
+
+    return {
+        "trades": trades_list,
+        "deposits": deposits_list,
+        "withdrawals": withdrawals_list,
+        "watchlist": watchlist_list,
+        "tickets": tickets_list
+    }
+
+
 @router.put("/users/{user_id}")
 def update_user_profile(
     user_id: int,
@@ -1605,40 +1751,6 @@ def delete_admin(
     return {"message": "Administrator account and all related data deleted successfully"}
 
 
-@router.get("/audit-logs")
-def list_audit_logs(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    if not current_user.is_admin:
-        raise HTTPException(
-            status_code=403,
-            detail="Admin access required"
-        )
-
-    from app.models.audit_log import AdminAuditLog
-
-    logs = (
-        db.query(AdminAuditLog, User)
-        .join(User, User.id == AdminAuditLog.admin_id)
-        .order_by(AdminAuditLog.timestamp.desc())
-        .all()
-    )
-
-    return [
-        {
-            "id": log.id,
-            "admin_id": log.admin_id,
-            "admin_email": "tradex.adminn@gmail.com" if (log.action == "Deactivate Maintenance Mode" and log.details and "email" in log.details.lower()) else user.email,
-            "admin_username": "tradex.adminn@gmail.com" if (log.action == "Deactivate Maintenance Mode" and log.details and "email" in log.details.lower()) else user.username,
-            "action": log.action,
-            "details": log.details,
-            "ip_address": log.ip_address,
-            "timestamp": log.timestamp.isoformat()
-        }
-        for log, user in logs
-    ]
-
 
 @router.get("/trades")
 def list_trades(
@@ -1983,32 +2095,79 @@ def delete_stock(
 
 
 def generate_pdf(title: str, rows: list) -> bytes:
-    stream_lines = []
-    stream_lines.append("BT")
-    stream_lines.append("/F1 16 Tf")
-    stream_lines.append("72 780 Td")
-    stream_lines.append(f"({title}) Tj")
-    stream_lines.append("0 -40 Td")
-    stream_lines.append("/F1 11 Tf")
+    # Wrap lines to prevent horizontal cropping
+    wrapped_lines = []
     for row in rows:
-        escaped_row = row.replace("(", "\\(").replace(")", "\\)")
-        stream_lines.append(f"({escaped_row}) Tj")
-        stream_lines.append("0 -20 Td")
-    stream_lines.append("ET")
-    
-    stream_content = "\n".join(stream_lines).encode("utf-8")
-    stream_len = len(stream_content)
-    
+        parts = row.split("\n")
+        for part in parts:
+            if not part.strip():
+                wrapped_lines.append("")
+                continue
+            
+            # Wrap lines at 80 characters
+            words = part.split(" ")
+            current_line = []
+            for word in words:
+                if sum(len(w) + 1 for w in current_line) + len(word) <= 80:
+                    current_line.append(word)
+                else:
+                    wrapped_lines.append(" ".join(current_line))
+                    current_line = [word]
+            if current_line:
+                wrapped_lines.append(" ".join(current_line))
+
+    # Pagination: 32 lines max per page
+    lines_per_page = 32
+    pages_data = []
+    if not wrapped_lines:
+        pages_data = [[]]
+    else:
+        pages_data = [wrapped_lines[i:i + lines_per_page] for i in range(0, len(wrapped_lines), lines_per_page)]
+
     objects = []
+    # 1. Catalog Object
     objects.append(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
-    objects.append(b"2 0 obj\n<< /Type /Pages /Kids [4 0 R] /Count 1 >>\nendobj\n")
-    objects.append(b"3 0 obj\n<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>\nendobj\n")
-    objects.append(b"4 0 obj\n<< /Type /Page /Parent 2 0 R /Resources 3 0 R /MediaBox [0 0 595 842] /Contents 5 0 R >>\nendobj\n")
-    objects.append(f"5 0 obj\n<< /Length {stream_len} >>\nstream\n".encode("utf-8") + stream_content + b"\nendstream\nendobj\n")
     
+    # 2. Pages Object
+    num_pages = len(pages_data)
+    kids_str = " ".join([f"{4 + 2*i} 0 R" for i in range(num_pages)])
+    objects.append(f"2 0 obj\n<< /Type /Pages /Kids [{kids_str}] /Count {num_pages} >>\nendobj\n".encode("utf-8"))
+    
+    # 3. Font Object
+    objects.append(b"3 0 obj\n<< /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>\nendobj\n")
+
+    # Write each page
+    for i, page_lines in enumerate(pages_data):
+        stream_lines = []
+        stream_lines.append("BT")
+        stream_lines.append("/F1 14 Tf")
+        stream_lines.append("50 800 Td")
+        page_title = f"{title} (Page {i+1} of {num_pages})"
+        escaped_title = page_title.replace("(", "\\(").replace(")", "\\)")
+        stream_lines.append(f"({escaped_title}) Tj")
+        stream_lines.append("0 -30 Td")
+        stream_lines.append("/F1 10 Tf")
+        
+        for line in page_lines:
+            escaped_line = line.replace("(", "\\(").replace(")", "\\)")
+            stream_lines.append(f"({escaped_line}) Tj")
+            stream_lines.append("0 -22 Td")
+        stream_lines.append("ET")
+        
+        stream_content = "\n".join(stream_lines).encode("utf-8")
+        stream_len = len(stream_content)
+        
+        # Page object at index 4 + 2*i
+        page_obj = f"{4 + 2*i} 0 obj\n<< /Type /Page /Parent 2 0 R /Resources 3 0 R /MediaBox [0 0 595 842] /Contents {5 + 2*i} 0 R >>\nendobj\n".encode("utf-8")
+        # Content stream object at index 5 + 2*i
+        content_obj = f"{5 + 2*i} 0 obj\n<< /Length {stream_len} >>\nstream\n".encode("utf-8") + stream_content + b"\nendstream\nendobj\n"
+        
+        objects.append(page_obj)
+        objects.append(content_obj)
+
+    # Compile PDF
     offsets = [0]
     pdf_data = b"%PDF-1.4\n"
-    
     for obj in objects:
         offsets.append(len(pdf_data))
         pdf_data += obj
@@ -2032,6 +2191,7 @@ def generate_pdf(title: str, rows: list) -> bytes:
 @router.get("/reports/generate")
 def generate_report(
     period: str, # daily, weekly, monthly, custom
+    request: Request,
     start_date: str = None,
     end_date: str = None,
     current_user: User = Depends(get_current_user),
@@ -2130,6 +2290,8 @@ def generate_report(
     db.add(history_rec)
     db.commit()
 
+    log_audit(db, current_user.id, "Generate Report", f"Generated {period.capitalize()} report", request.client.host if request.client else None, "Reports", "Success", request)
+
     return {
         "generated_at": now.isoformat(),
         "generated_by": current_user.email,
@@ -2143,6 +2305,7 @@ def generate_report(
 @router.post("/reports/export")
 def export_report(
     payload: dict,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -2246,6 +2409,7 @@ def export_report(
         for row in report_data:
             writer.writerow(row)
         output.seek(0)
+        log_audit(db, current_user.id, "Export Report", f"Exported {period.capitalize()} report as CSV", request.client.host if request.client else None, "Reports", "Success", request)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
             media_type="text/csv",
@@ -2258,6 +2422,7 @@ def export_report(
         for row in report_data:
             writer.writerow(row)
         output.seek(0)
+        log_audit(db, current_user.id, "Export Report", f"Exported {period.capitalize()} report as Excel", request.client.host if request.client else None, "Reports", "Success", request)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode("utf-8")),
             media_type="application/vnd.ms-excel",
@@ -2267,12 +2432,14 @@ def export_report(
     elif export_format == "pdf":
         rows = [f"{label}: {val}" if label else "" for label, val in report_data]
         pdf_bytes = generate_pdf(f"TradeX {report_label}", rows)
+        log_audit(db, current_user.id, "Export Report", f"Exported {period.capitalize()} report as PDF", request.client.host if request.client else None, "Reports", "Success", request)
         return StreamingResponse(
             io.BytesIO(pdf_bytes),
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename={filename}.pdf"}
         )
     else:
+        log_audit(db, current_user.id, "Export Report", f"Attempted to export {period.capitalize()} report as {export_format} (Invalid format)", request.client.host if request.client else None, "Reports", "Failed", request)
         raise HTTPException(status_code=400, detail="Invalid format")
 
 
@@ -2644,3 +2811,1046 @@ def get_settings_history(
     return result
 
 
+@router.get("/analytics")
+def get_analytics(
+    time_filter: str = "this_month",
+    start_date: str = None,
+    end_date: str = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin or current_user.role not in ["Administrator", "Super Administrator"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+
+    from app.models.user import User
+    from app.models.deposit import Deposit
+    from app.models.withdrawal import Withdrawal
+    from app.models.trade import Trade
+    from app.models.chat_history import ChatHistory
+    from app.models.support import SupportTicket
+    from sqlalchemy import func
+    
+    now = datetime.utcnow()
+    
+    if time_filter == "today":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        group_by_hour = True
+    elif time_filter == "this_week":
+        start = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        group_by_hour = False
+    elif time_filter == "this_month":
+        start = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        group_by_hour = False
+    elif time_filter == "custom":
+        if not start_date or not end_date:
+            raise HTTPException(status_code=400, detail="Start date and end date are required for custom filter")
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d").replace(hour=0, minute=0, second=0, microsecond=0)
+            end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, microsecond=999999)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        if (end - start).days > 90:
+            raise HTTPException(status_code=400, detail="Custom date range cannot exceed 90 days")
+        group_by_hour = False
+    else:
+        raise HTTPException(status_code=400, detail="Invalid time filter")
+
+    # Base user count before start date for User Growth
+    base_user_count = db.query(User).filter(User.created_at < start).count()
+
+    # Generate buckets
+    buckets = []
+    current = start
+    if group_by_hour:
+        while current <= end:
+            buckets.append(current)
+            current += timedelta(hours=1)
+    else:
+        while current.date() <= end.date():
+            buckets.append(current.date())
+            current += timedelta(days=1)
+
+    bucket_map = {}
+    for b in buckets:
+        if group_by_hour:
+            key = b.strftime("%H:00")
+            label = b.strftime("%I %p")
+        else:
+            key = b.strftime("%Y-%m-%d")
+            label = b.strftime("%b %d")
+            
+        bucket_map[key] = {
+            "key": key,
+            "label": label,
+            "new_users": 0,
+            "user_growth": 0,
+            "deposits_amount": 0.0,
+            "deposits_count": 0,
+            "withdrawals_amount": 0.0,
+            "withdrawals_count": 0,
+            "trades_amount": 0.0,
+            "trades_count": 0,
+            "revenue": 0.0,
+            "ai_requests": 0,
+            "support_tickets": 0,
+            "details": {
+                "users": [],
+                "deposits": [],
+                "withdrawals": [],
+                "trades": [],
+                "ai_requests": [],
+                "support_tickets": []
+            }
+        }
+
+    # Fetch data filtered by date range
+    users_data = db.query(User).filter(User.created_at >= start, User.created_at <= end).all()
+    deposits_data = db.query(Deposit).options(joinedload(Deposit.user)).filter(Deposit.created_at >= start, Deposit.created_at <= end).all()
+    withdrawals_data = db.query(Withdrawal).options(joinedload(Withdrawal.user)).filter(Withdrawal.created_at >= start, Withdrawal.created_at <= end).all()
+    trades_data = db.query(Trade).options(joinedload(Trade.user), joinedload(Trade.stock)).filter(Trade.created_at >= start, Trade.created_at <= end).all()
+    ai_data = db.query(ChatHistory).options(joinedload(ChatHistory.user)).filter(ChatHistory.created_at >= start, ChatHistory.created_at <= end).all()
+    tickets_data = db.query(SupportTicket).options(joinedload(SupportTicket.user)).filter(SupportTicket.created_at >= start, SupportTicket.created_at <= end).all()
+
+    def get_bucket_key(dt):
+        if group_by_hour:
+            return dt.replace(minute=0, second=0, microsecond=0).strftime("%H:00")
+        else:
+            return dt.strftime("%Y-%m-%d")
+
+    for u in users_data:
+        k = get_bucket_key(u.created_at)
+        if k in bucket_map:
+            bucket_map[k]["new_users"] += 1
+            bucket_map[k]["details"]["users"].append({
+                "username": u.username,
+                "email": u.email,
+                "role": u.role,
+                "created_at": u.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+    for d in deposits_data:
+        k = get_bucket_key(d.created_at)
+        if k in bucket_map:
+            if d.status == "Approved":
+                bucket_map[k]["deposits_amount"] += d.amount
+            bucket_map[k]["deposits_count"] += 1
+            bucket_map[k]["details"]["deposits"].append({
+                "amount": d.amount,
+                "status": d.status,
+                "payment_type": d.payment_type,
+                "user_email": d.user.email if d.user else "Unknown",
+                "created_at": d.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+    for w in withdrawals_data:
+        k = get_bucket_key(w.created_at)
+        if k in bucket_map:
+            if w.status == "Approved":
+                bucket_map[k]["withdrawals_amount"] += w.amount
+            bucket_map[k]["withdrawals_count"] += 1
+            bucket_map[k]["details"]["withdrawals"].append({
+                "amount": w.amount,
+                "status": w.status,
+                "user_email": w.user.email if w.user else "Unknown",
+                "created_at": w.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+    for t in trades_data:
+        k = get_bucket_key(t.created_at)
+        if k in bucket_map:
+            val = t.price * t.quantity
+            bucket_map[k]["trades_amount"] += val
+            bucket_map[k]["trades_count"] += 1
+            bucket_map[k]["details"]["trades"].append({
+                "trade_type": t.trade_type,
+                "quantity": t.quantity,
+                "price": t.price,
+                "stock_symbol": t.stock.symbol if t.stock else "Unknown",
+                "user_email": t.user.email if t.user else "Unknown",
+                "created_at": t.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+    for c in ai_data:
+        k = get_bucket_key(c.created_at)
+        if k in bucket_map:
+            bucket_map[k]["ai_requests"] += 1
+            bucket_map[k]["details"]["ai_requests"].append({
+                "user_email": c.user.email if c.user else "Unknown",
+                "question": c.question[:100] + "..." if len(c.question) > 100 else c.question,
+                "created_at": c.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+    for s in tickets_data:
+        k = get_bucket_key(s.created_at)
+        if k in bucket_map:
+            bucket_map[k]["support_tickets"] += 1
+            bucket_map[k]["details"]["support_tickets"].append({
+                "ticket_number": s.ticket_number,
+                "issue_type": s.issue_type,
+                "status": s.status,
+                "user_email": s.user.email if s.user else "Unknown",
+                "created_at": s.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+    sorted_keys = sorted(bucket_map.keys())
+    chart_list = []
+    current_growth = base_user_count
+
+    for key in sorted_keys:
+        bucket = bucket_map[key]
+        current_growth += bucket["new_users"]
+        bucket["user_growth"] = current_growth
+        bucket["revenue"] = (bucket["trades_amount"] * 0.001) + (bucket["deposits_amount"] * 0.005)
+        chart_list.append(bucket)
+
+    # General totals
+    total_users_all = db.query(User).count()
+    total_trades_all = db.query(Trade).count()
+    total_ai_requests_all = db.query(ChatHistory).count()
+    total_support_tickets_all = db.query(SupportTicket).count()
+    total_deposits_amount_all = db.query(func.sum(Deposit.amount)).filter(Deposit.status == "Approved").scalar() or 0.0
+    total_withdrawals_amount_all = db.query(func.sum(Withdrawal.amount)).filter(Withdrawal.status == "Approved").scalar() or 0.0
+    total_trades_volume_all = db.query(func.sum(Trade.price * Trade.quantity)).scalar() or 0.0
+    total_revenue_all = (total_trades_volume_all * 0.001) + (total_deposits_amount_all * 0.005)
+
+    return {
+        "summary": {
+            "total_users": total_users_all,
+            "total_revenue": total_revenue_all,
+            "total_trades": total_trades_all,
+            "total_deposits": total_deposits_amount_all,
+            "total_withdrawals": total_withdrawals_amount_all,
+            "total_ai_requests": total_ai_requests_all,
+            "total_support_tickets": total_support_tickets_all
+        },
+        "charts": chart_list
+    }
+
+
+@router.get("/audit-logs")
+def get_audit_logs(
+    search: str = None,
+    start_date: str = None,
+    end_date: str = None,
+    admin_id: int = None,
+    module: str = None,
+    action: str = None,
+    status: str = None,
+    sort: str = "newest",
+    page: int = 1,
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from app.models.audit_log import AdminAuditLog
+    from app.models.user import User as DBUser
+    from sqlalchemy.orm import joinedload
+    
+    query = db.query(AdminAuditLog).join(DBUser, AdminAuditLog.admin_id == DBUser.id)
+
+    if not start_date and not end_date:
+        limit = 5
+
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (DBUser.username.ilike(search_filter)) |
+            (DBUser.email.ilike(search_filter)) |
+            (AdminAuditLog.action.ilike(search_filter)) |
+            (AdminAuditLog.details.ilike(search_filter))
+        )
+
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(AdminAuditLog.timestamp >= start_dt)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(AdminAuditLog.timestamp <= end_dt)
+        except ValueError:
+            pass
+
+    if admin_id:
+        query = query.filter(AdminAuditLog.admin_id == admin_id)
+    if module:
+        query = query.filter(AdminAuditLog.module == module)
+    if action:
+        query = query.filter(AdminAuditLog.action == action)
+    if status:
+        query = query.filter(AdminAuditLog.status == status)
+
+    if sort == "oldest":
+        query = query.order_by(AdminAuditLog.timestamp.asc())
+    else:
+        query = query.order_by(AdminAuditLog.timestamp.desc())
+
+    total_count = query.count()
+    if not start_date and not end_date:
+        total_count = min(total_count, 5)
+    offset = (page - 1) * limit
+    logs = query.options(joinedload(AdminAuditLog.admin)).offset(offset).limit(limit).all()
+
+    admins_with_logs = db.query(DBUser.id, DBUser.username, DBUser.email).filter(DBUser.is_admin == True).all()
+    
+    distinct_modules = [
+        "Deposits", "Withdrawals", "User Management", "Admin Management",
+        "Stock Management", "System Settings", "Support", "Reports",
+        "Maintenance", "Authentication", "Other"
+    ]
+
+    distinct_actions = [
+        "Administrator Login", "Administrator Logout", "Approve Deposit",
+        "Reject Deposit", "Approve Withdrawal", "Reject Withdrawal",
+        "Update User Profile", "Toggle User Status", "Delete User",
+        "Send Reset Password OTP", "Reset Password", "Force Logout User",
+        "Change Permissions", "Toggle Admin Status", "Delete Admin",
+        "Add Stock", "Update Stock", "Delete Stock", "Update System Settings",
+        "Deactivate Maintenance Mode", "Generate Report", "Export Report"
+    ]
+
+    distinct_statuses = ["Success", "Failed"]
+
+
+    return {
+        "logs": [
+            {
+                "id": log.id,
+                "admin_id": log.admin_id,
+                "admin_name": log.admin.username if log.admin else "Unknown",
+                "admin_email": log.admin.email if log.admin else "Unknown",
+                "action": log.action,
+                "module": log.module or "Other",
+                "details": log.details,
+                "ip_address": log.ip_address,
+                "device_browser": log.device_browser or "Unknown",
+                "status": log.status or "Success",
+                "timestamp": log.timestamp.isoformat() if log.timestamp else None
+            }
+            for log in logs
+        ],
+        "total_count": total_count,
+        "page": page,
+        "limit": limit,
+        "filters": {
+            "admins": [{"id": a[0], "username": a[1], "email": a[2]} for a in admins_with_logs],
+            "modules": distinct_modules,
+            "actions": distinct_actions,
+            "statuses": distinct_statuses
+        }
+    }
+
+
+@router.post("/audit-logs/export")
+def export_audit_logs(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from app.models.audit_log import AdminAuditLog
+    from app.models.user import User as DBUser
+    from fastapi.responses import StreamingResponse
+    import io
+    import csv
+
+    export_format = payload.get("format", "csv").lower()
+    search = payload.get("search")
+    start_date = payload.get("start_date")
+    end_date = payload.get("end_date")
+    admin_id = payload.get("admin_id")
+    module = payload.get("module")
+    action = payload.get("action")
+    status = payload.get("status")
+    sort = payload.get("sort", "newest")
+
+    query = db.query(AdminAuditLog).join(DBUser, AdminAuditLog.admin_id == DBUser.id)
+
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (DBUser.username.ilike(search_filter)) |
+            (DBUser.email.ilike(search_filter)) |
+            (AdminAuditLog.action.ilike(search_filter)) |
+            (AdminAuditLog.details.ilike(search_filter))
+        )
+
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(AdminAuditLog.timestamp >= start_dt)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(AdminAuditLog.timestamp <= end_dt)
+        except ValueError:
+            pass
+    if admin_id:
+        query = query.filter(AdminAuditLog.admin_id == admin_id)
+    if module:
+        query = query.filter(AdminAuditLog.module == module)
+    if action:
+        query = query.filter(AdminAuditLog.action == action)
+    if status:
+        query = query.filter(AdminAuditLog.status == status)
+
+    if sort == "oldest":
+        query = query.order_by(AdminAuditLog.timestamp.asc())
+    else:
+        query = query.order_by(AdminAuditLog.timestamp.desc())
+
+    if not start_date and not end_date:
+        query = query.limit(5)
+
+    logs = query.all()
+
+    filename = f"audit_logs_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+
+    header = ["ID", "Timestamp", "Admin Name", "Admin Email", "Action", "Module", "Description", "IP Address", "Device/Browser", "Status"]
+    rows = []
+    for log in logs:
+        rows.append([
+            str(log.id),
+            log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "",
+            log.admin.username if log.admin else "Unknown",
+            log.admin.email if log.admin else "Unknown",
+            log.action,
+            log.module or "Other",
+            log.details or "",
+            log.ip_address or "",
+            log.device_browser or "Unknown",
+            log.status or "Success"
+        ])
+
+    if export_format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(header)
+        writer.writerows(rows)
+        output.seek(0)
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}.csv"}
+        )
+
+    elif export_format == "excel":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(header)
+        writer.writerows(rows)
+        output.seek(0)
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8")),
+            media_type="application/vnd.ms-excel",
+            headers={"Content-Disposition": f"attachment; filename={filename}.xls"}
+        )
+
+    elif export_format == "pdf":
+        formatted_rows = []
+        for r in rows:
+            formatted_rows.append(f"[{r[1]}] {r[2]} ({r[3]}) - {r[4]} | Module: {r[5]} | IP: {r[7]} | Status: {r[9]}\nDetails: {r[6]}\n")
+        pdf_bytes = generate_pdf("TradeX Admin Audit Logs", formatted_rows)
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}.pdf"}
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Invalid format")
+
+
+import threading
+from fastapi import UploadFile, File
+backup_lock = threading.Lock()
+
+
+@router.get("/backups")
+def get_backups(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    import os
+    import json
+    
+    backup_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backups")
+    os.makedirs(backup_dir, exist_ok=True)
+    metadata_path = os.path.join(backup_dir, "metadata.json")
+    
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, "r") as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+    else:
+        history = []
+        
+    valid_history = []
+    for item in history:
+        file_path = os.path.join(backup_dir, item["filename"])
+        if os.path.exists(file_path):
+            valid_history.append(item)
+            
+    last_backup = None
+    if valid_history:
+        sorted_history = sorted(valid_history, key=lambda x: x["created_at"], reverse=True)
+        last_backup = sorted_history[0]["created_at"]
+        
+    return {
+        "history": valid_history,
+        "last_backup": last_backup
+    }
+
+
+@router.post("/backups")
+def create_backup(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    if not backup_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Another backup or restore operation is already in progress.")
+        
+    try:
+        import os
+        import json
+        import datetime
+        from sqlalchemy import inspect, text
+        from app.core.database import engine
+        
+        backup_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"TradeX_Backup_{timestamp}.sql"
+        file_path = os.path.join(backup_dir, filename)
+        
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        
+        sql_lines = []
+        sql_lines.append("-- TradeX Database Backup")
+        sql_lines.append(f"-- Created: {datetime.datetime.utcnow().isoformat()}")
+        sql_lines.append(f"-- Created By: {current_user.username}")
+        sql_lines.append("--\n")
+        
+        sql_lines.append("SET session_replication_role = 'replica';")
+        
+        for table in tables:
+            if table in ("spatial_ref_sys", "alembic_version"):
+                continue
+            sql_lines.append(f"TRUNCATE TABLE \"{table}\" CASCADE;")
+            
+        sql_lines.append("\n")
+        
+        with engine.connect() as connection:
+            for table in tables:
+                if table in ("spatial_ref_sys", "alembic_version"):
+                    continue
+                    
+                columns = [col["name"] for col in inspector.get_columns(table)]
+                col_str = ", ".join([f'"{c}"' for c in columns])
+                
+                result = connection.execute(text(f'SELECT * FROM "{table}"'))
+                rows = result.fetchall()
+                
+                if not rows:
+                    continue
+                    
+                sql_lines.append(f"-- Data for table: {table}")
+                for row in rows:
+                    val_list = []
+                    for val in row:
+                        if val is None:
+                            val_list.append("NULL")
+                        elif isinstance(val, (int, float)):
+                            val_list.append(str(val))
+                        elif isinstance(val, bool):
+                            val_list.append("TRUE" if val else "FALSE")
+                        elif isinstance(val, (datetime.datetime, datetime.date)):
+                            val_list.append(f"'{val.isoformat()}'")
+                        else:
+                            escaped = str(val).replace("'", "''")
+                            val_list.append(f"'{escaped}'")
+                    val_str = ", ".join(val_list)
+                    sql_lines.append(f'INSERT INTO "{table}" ({col_str}) VALUES ({val_str});')
+                sql_lines.append("\n")
+                
+        sql_lines.append("SET session_replication_role = 'origin';")
+        sql_content = "\n".join(sql_lines)
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(sql_content)
+            
+        size_bytes = os.path.getsize(file_path)
+        
+        metadata_path = os.path.join(backup_dir, "metadata.json")
+        if os.path.exists(metadata_path):
+            try:
+                with open(metadata_path, "r") as f:
+                    history = json.load(f)
+            except Exception:
+                history = []
+        else:
+            history = []
+            
+        new_backup = {
+            "filename": filename,
+            "size_bytes": size_bytes,
+            "created_by": current_user.username,
+            "created_at": datetime.datetime.now().isoformat()
+        }
+        history.append(new_backup)
+        
+        with open(metadata_path, "w") as f:
+            json.dump(history, f, indent=2)
+            
+        log_audit(db, current_user.id, "Create Backup", f"Generated backup file: {filename}", None)
+        
+        return new_backup
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
+    finally:
+        backup_lock.release()
+
+
+@router.get("/backups/{filename}")
+def download_backup(
+    filename: str,
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    import os
+    from fastapi.responses import FileResponse
+    
+    backup_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backups")
+    file_path = os.path.join(backup_dir, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Backup file not found")
+        
+    return FileResponse(
+        file_path,
+        media_type="application/octet-stream",
+        filename=filename
+    )
+
+
+@router.delete("/backups/{filename}")
+def delete_backup(
+    filename: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    import os
+    import json
+    
+    backup_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "backups")
+    file_path = os.path.join(backup_dir, filename)
+    
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+            
+    metadata_path = os.path.join(backup_dir, "metadata.json")
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, "r") as f:
+                history = json.load(f)
+            history = [item for item in history if item["filename"] != filename]
+            with open(metadata_path, "w") as f:
+                json.dump(history, f, indent=2)
+        except Exception:
+            pass
+            
+    log_audit(db, current_user.id, "Delete Backup", f"Deleted backup file: {filename}", None)
+    return {"message": "Backup deleted successfully"}
+
+
+@router.post("/backups/restore")
+def restore_backup(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    if not backup_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Another backup or restore operation is already in progress.")
+        
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text
+        
+        contents = file.file.read().decode("utf-8")
+        
+        if not contents.startswith("-- TradeX Database Backup"):
+            raise HTTPException(status_code=400, detail="Invalid backup file format. Must be a valid TradeX SQL backup.")
+            
+        with engine.begin() as connection:
+            connection.execute(text(contents))
+            
+        log_audit(db, current_user.id, "Restore Database", f"Restored database from uploaded backup: {file.filename}", None)
+        return {"message": "Database restored successfully"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")
+    finally:
+        backup_lock.release()
+
+
+
+
+
+# ==========================================
+# Banners & Market Holidays Management
+# ==========================================
+
+from app.models.banner import Banner
+from app.models.holiday import MarketHoliday
+from pydantic import BaseModel
+from datetime import datetime
+
+
+class BannerCreate(BaseModel):
+    title: str
+    description: str
+    image_url: str
+    button_text: str = None
+    button_url: str = None
+    banner_type: str
+    start_date: datetime
+    end_date: datetime
+    priority: int = 0
+    is_active: bool = True
+
+
+class HolidayCreate(BaseModel):
+    name: str
+    date: datetime
+    holiday_type: str
+    market_status: str
+    start_time: str = None
+    end_time: str = None
+    description: str = None
+    is_active: bool = True
+
+
+# --- Banners Management ---
+
+@router.get("/banners")
+def list_banners(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    banners = db.query(Banner).order_by(Banner.priority.desc(), Banner.created_at.desc()).all()
+    return banners
+
+
+@router.post("/banners")
+def create_banner(
+    payload: BannerCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    banner = Banner(
+        title=payload.title,
+        description=payload.description,
+        image_url=payload.image_url,
+        button_text=payload.button_text,
+        button_url=payload.button_url,
+        banner_type=payload.banner_type,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        priority=payload.priority,
+        is_active=payload.is_active
+    )
+    db.add(banner)
+    db.commit()
+    db.refresh(banner)
+    
+    log_audit(db, current_user.id, "Add Banner", f"Added banner: {banner.title} (Type: {banner.banner_type})", None)
+    return banner
+
+
+@router.put("/banners/{banner_id}")
+def update_banner(
+    banner_id: int,
+    payload: BannerCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    banner = db.query(Banner).filter(Banner.id == banner_id).first()
+    if not banner:
+        raise HTTPException(status_code=404, detail="Banner not found")
+        
+    banner.title = payload.title
+    banner.description = payload.description
+    banner.image_url = payload.image_url
+    banner.button_text = payload.button_text
+    banner.button_url = payload.button_url
+    banner.banner_type = payload.banner_type
+    banner.start_date = payload.start_date
+    banner.end_date = payload.end_date
+    banner.priority = payload.priority
+    banner.is_active = payload.is_active
+    
+    db.commit()
+    db.refresh(banner)
+    
+    log_audit(db, current_user.id, "Edit Banner", f"Updated banner: {banner.title}", None)
+    return banner
+
+
+@router.delete("/banners/{banner_id}")
+def delete_banner(
+    banner_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    banner = db.query(Banner).filter(Banner.id == banner_id).first()
+    if not banner:
+        raise HTTPException(status_code=404, detail="Banner not found")
+        
+    banner_title = banner.title
+    db.delete(banner)
+    db.commit()
+    
+    log_audit(db, current_user.id, "Delete Banner", f"Deleted banner: {banner_title}", None)
+    return {"message": "Banner deleted successfully"}
+
+
+@router.patch("/banners/{banner_id}/toggle")
+def toggle_banner(
+    banner_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    banner = db.query(Banner).filter(Banner.id == banner_id).first()
+    if not banner:
+        raise HTTPException(status_code=404, detail="Banner not found")
+        
+    banner.is_active = not banner.is_active
+    db.commit()
+    db.refresh(banner)
+    
+    action_str = "Enabled" if banner.is_active else "Disabled"
+    log_audit(db, current_user.id, "Toggle Banner Status", f"{action_str} banner: {banner.title}", None)
+    return banner
+
+
+@router.get("/banners/active")
+def get_active_banners(db: Session = Depends(get_db)):
+    import datetime
+    now = datetime.datetime.now()
+    active_banners = (
+        db.query(Banner)
+        .filter(Banner.is_active == True)
+        .filter(Banner.start_date <= now)
+        .filter(Banner.end_date >= now)
+        .order_by(Banner.priority.desc())
+        .all()
+    )
+    return active_banners
+
+
+# --- Market Holidays Management ---
+
+@router.get("/holidays")
+def list_holidays(
+    search: str = None,
+    year: int = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    query = db.query(MarketHoliday)
+    
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (MarketHoliday.name.ilike(search_filter)) |
+            (MarketHoliday.description.ilike(search_filter))
+        )
+        
+    if year:
+        # Filter dates by year
+        start_year = datetime(year, 1, 1)
+        end_year = datetime(year, 12, 31, 23, 59, 59)
+        query = query.filter(MarketHoliday.date >= start_year).filter(MarketHoliday.date <= end_year)
+        
+    holidays = query.order_by(MarketHoliday.date.asc()).all()
+    return holidays
+
+
+@router.post("/holidays")
+def create_holiday(
+    payload: HolidayCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    existing = db.query(MarketHoliday).filter(MarketHoliday.date == payload.date).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A holiday is already registered for this date.")
+        
+    holiday = MarketHoliday(
+        name=payload.name,
+        date=payload.date,
+        holiday_type=payload.holiday_type,
+        market_status=payload.market_status,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        description=payload.description,
+        is_active=payload.is_active
+    )
+    db.add(holiday)
+    db.commit()
+    db.refresh(holiday)
+    
+    log_audit(db, current_user.id, "Add Holiday", f"Added holiday: {holiday.name} (Date: {holiday.date.strftime('%Y-%m-%d')})", None)
+    return holiday
+
+
+@router.put("/holidays/{holiday_id}")
+def update_holiday(
+    holiday_id: int,
+    payload: HolidayCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    holiday = db.query(MarketHoliday).filter(MarketHoliday.id == holiday_id).first()
+    if not holiday:
+        raise HTTPException(status_code=404, detail="Holiday not found")
+        
+    existing = db.query(MarketHoliday).filter(MarketHoliday.date == payload.date).filter(MarketHoliday.id != holiday_id).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A holiday is already registered for this date.")
+        
+    holiday.name = payload.name
+    holiday.date = payload.date
+    holiday.holiday_type = payload.holiday_type
+    holiday.market_status = payload.market_status
+    holiday.start_time = payload.start_time
+    holiday.end_time = payload.end_time
+    holiday.description = payload.description
+    holiday.is_active = payload.is_active
+    
+    db.commit()
+    db.refresh(holiday)
+    
+    log_audit(db, current_user.id, "Edit Holiday", f"Updated holiday: {holiday.name}", None)
+    return holiday
+
+
+@router.delete("/holidays/{holiday_id}")
+def delete_holiday(
+    holiday_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    holiday = db.query(MarketHoliday).filter(MarketHoliday.id == holiday_id).first()
+    if not holiday:
+        raise HTTPException(status_code=404, detail="Holiday not found")
+        
+    holiday_name = holiday.name
+    db.delete(holiday)
+    db.commit()
+    
+    log_audit(db, current_user.id, "Delete Holiday", f"Deleted holiday: {holiday_name}", None)
+    return {"message": "Holiday deleted successfully"}
+
+
+@router.patch("/holidays/{holiday_id}/toggle")
+def toggle_holiday(
+    holiday_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    holiday = db.query(MarketHoliday).filter(MarketHoliday.id == holiday_id).first()
+    if not holiday:
+        raise HTTPException(status_code=404, detail="Holiday not found")
+        
+    holiday.is_active = not holiday.is_active
+    db.commit()
+    db.refresh(holiday)
+    
+    action_str = "Enabled" if holiday.is_active else "Disabled"
+    log_audit(db, current_user.id, "Toggle Holiday Status", f"{action_str} holiday: {holiday.name}", None)
+    return holiday
+
+
+@router.get("/holidays/upcoming")
+def get_upcoming_holidays(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    import datetime
+    now = datetime.datetime.now()
+    today_start = datetime.datetime(now.year, now.month, now.day)
+    upcoming = (
+        db.query(MarketHoliday)
+        .filter(MarketHoliday.is_active == True)
+        .filter(MarketHoliday.date >= today_start)
+        .order_by(MarketHoliday.date.asc())
+        .all()
+    )
+    return upcoming

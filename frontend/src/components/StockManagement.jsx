@@ -56,6 +56,15 @@ export default function StockManagement() {
     loading: false
   });
 
+  const [statusConfirmation, setStatusConfirmation] = useState({
+    isOpen: false,
+    source: null,
+    stock: null,
+    symbol: "",
+    nextStatus: false,
+    loading: false
+  });
+
   // Fetch stocks from API
   async function fetchStocks() {
     try {
@@ -191,22 +200,64 @@ export default function StockManagement() {
     }
   }
 
-  // Toggle stock enabled/disabled status directly
-  async function handleToggleStatus(stock) {
+  function requestStatusToggle(stock) {
+    setStatusConfirmation({
+      isOpen: true,
+      source: "table",
+      stock,
+      symbol: stock.symbol,
+      nextStatus: !stock.is_active,
+      loading: false
+    });
+  }
+
+  function requestModalStatusToggle() {
+    const nextStatus = !stockModal.isActive;
+
+    if (stockModal.mode === "add") {
+      setStockModal(prev => ({ ...prev, isActive: nextStatus }));
+      return;
+    }
+
+    setStatusConfirmation({
+      isOpen: true,
+      source: "modal",
+      stock: null,
+      symbol: stockModal.symbol,
+      nextStatus,
+      loading: false
+    });
+  }
+
+  async function confirmStatusToggle() {
+    if (statusConfirmation.loading) return;
+
+    if (statusConfirmation.source === "modal") {
+      setStockModal(prev => ({ ...prev, isActive: statusConfirmation.nextStatus }));
+      setStatusConfirmation(prev => ({ ...prev, isOpen: false }));
+      return;
+    }
+
+    const stock = statusConfirmation.stock;
+    if (!stock) return;
+
     try {
-      const nextStatus = !stock.is_active;
+      setStatusConfirmation(prev => ({ ...prev, loading: true }));
       const payload = {
         company_name: stock.company_name,
         current_price: stock.current_price,
         market: stock.market,
-        is_active: nextStatus
+        is_active: statusConfirmation.nextStatus
       };
 
       await api.put(`/admin/stocks/${stock.id}`, payload, getAuthHeaders());
-      toast.success(`Stock ${stock.symbol} ${nextStatus ? "enabled" : "disabled"} successfully`);
+      toast.success(`Stock ${stock.symbol} ${statusConfirmation.nextStatus ? "enabled" : "disabled"} successfully`);
+      setStatusConfirmation(prev => ({ ...prev, isOpen: false }));
       fetchStocks();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to toggle stock status");
+    } finally {
+      setStatusConfirmation(prev => ({ ...prev, loading: false }));
     }
   }
 
@@ -357,14 +408,25 @@ export default function StockManagement() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
-                        onClick={() => handleToggleStatus(stock)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold border transition cursor-pointer ${
+                        type="button"
+                        role="switch"
+                        aria-checked={stock.is_active}
+                        aria-label={`${stock.is_active ? "Disable" : "Enable"} ${stock.symbol}`}
+                        onClick={() => requestStatusToggle(stock)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-2 py-1.5 text-xs font-bold transition cursor-pointer ${
                           stock.is_active
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
-                            : "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                            : "bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20"
                         }`}
                         title={stock.is_active ? "Click to Disable stock" : "Click to Enable stock"}
                       >
+                        <span className={`relative h-5 w-9 rounded-full transition-colors ${
+                          stock.is_active ? "bg-emerald-500" : "bg-rose-500/35"
+                        }`}>
+                          <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                            stock.is_active ? "translate-x-4" : "translate-x-0"
+                          }`} />
+                        </span>
                         {stock.is_active ? "Enabled" : "Disabled"}
                       </button>
                     </td>
@@ -516,18 +578,48 @@ export default function StockManagement() {
                 />
               </div>
 
-              {/* Status checkbox */}
-              <div className="flex items-center gap-3 pt-2">
-                <input
+              {/* Trading status toggle */}
+              <div
+                className={`flex items-center justify-between gap-4 rounded-2xl border p-4 transition-colors ${
+                  stockModal.isActive
+                    ? "border-emerald-500/30 bg-emerald-500/10"
+                    : "border-rose-500/30 bg-rose-500/10"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold">Trading status</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                      stockModal.isActive
+                        ? "bg-emerald-500/15 text-emerald-500"
+                        : "bg-rose-500/15 text-rose-500"
+                    }`}>
+                      {stockModal.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs opacity-60">
+                    {stockModal.isActive ? "Users can select and trade this stock." : "This stock is disabled for users."}
+                  </p>
+                </div>
+                <button
                   id="modal-is-active"
-                  type="checkbox"
-                  checked={stockModal.isActive}
-                  onChange={(e) => setStockModal(prev => ({ ...prev, isActive: e.target.checked }))}
-                  className="w-4.5 h-4.5 rounded border cursor-pointer accent-accent"
-                />
-                <label htmlFor="modal-is-active" className="font-semibold cursor-pointer opacity-90">
-                  Enable stock for user trading
-                </label>
+                  type="button"
+                  role="switch"
+                  aria-checked={stockModal.isActive}
+                  aria-label="Enable stock for user trading"
+                  onClick={requestModalStatusToggle}
+                  className={`relative h-9 w-16 shrink-0 rounded-full border-2 shadow-inner transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                    stockModal.isActive
+                      ? "border-emerald-400 bg-emerald-500 focus:ring-emerald-400"
+                      : "border-rose-400 bg-rose-500/30 focus:ring-rose-400"
+                  }`}
+                >
+                  <span
+                    className={`absolute left-0.5 top-0.5 h-7 w-7 rounded-full bg-white shadow-lg transition-transform ${
+                      stockModal.isActive ? "translate-x-7" : "translate-x-0"
+                    }`}
+                  />
+                </button>
               </div>
 
               {/* Actions buttons */}
@@ -562,6 +654,29 @@ export default function StockManagement() {
         confirmText={deleteModal.loading ? "Deleting..." : "Delete Stock"}
         onCancel={() => setDeleteModal(prev => ({ ...prev, isOpen: false }))}
         onConfirm={handleDeleteConfirm}
+      />
+      <ConfirmDialog
+        isOpen={statusConfirmation.isOpen}
+        title={`${statusConfirmation.nextStatus ? "Enable" : "Disable"} ${statusConfirmation.symbol}?`}
+        message={
+          statusConfirmation.nextStatus
+            ? "This stock will become active and users will be able to select and trade it."
+            : "This stock will become inactive and users will no longer be able to select or trade it."
+        }
+        confirmText={
+          statusConfirmation.loading
+            ? "Updating..."
+            : statusConfirmation.nextStatus
+              ? "Yes, Enable"
+              : "Yes, Disable"
+        }
+        tone={statusConfirmation.nextStatus ? "default" : "danger"}
+        onCancel={() => {
+          if (!statusConfirmation.loading) {
+            setStatusConfirmation(prev => ({ ...prev, isOpen: false }));
+          }
+        }}
+        onConfirm={confirmStatusToggle}
       />
     </div>
   );

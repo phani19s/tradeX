@@ -400,6 +400,10 @@ def login(
         http_request
     )
 
+    if user.is_admin:
+        from app.api.admin import log_audit
+        log_audit(db, user.id, "Administrator Login", f"Administrator logged in successfully: {user.email}", http_request.client.host if http_request.client else None, "Authentication", "Success", http_request)
+
     return build_login_response(
         user,
         access_token
@@ -469,6 +473,10 @@ def login_with_two_factor(
         user,
         http_request
     )
+
+    if user.is_admin:
+        from app.api.admin import log_audit
+        log_audit(db, user.id, "Administrator Login", f"Administrator logged in successfully via 2FA: {user.email}", http_request.client.host if http_request.client else None, "Authentication", "Success", http_request)
 
     return build_login_response(
         user,
@@ -1134,6 +1142,11 @@ def logout_current_session(
         current_session.logout_time = now
         current_session.session_duration = seconds_between(current_session.created_at, now)
         add_login_history_from_session(db, current_session, "Logout")
+        user = db.query(User).filter(User.id == current_session.user_id).first()
+        if user and user.is_admin:
+            from app.api.admin import log_audit
+            log_audit(db, user.id, "Administrator Logout", f"Administrator logged out: {user.email}", current_session.ip_address, "Authentication", "Success", None)
+        
         db.commit()
 
     return {

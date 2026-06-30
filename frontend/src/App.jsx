@@ -26,13 +26,17 @@ import AdminAdminsPage from "./pages/AdminAdminsPage";
 import AdminSupportPage from "./pages/AdminSupportPage";
 import AdminTradingPage from "./pages/AdminTradingPage";
 import AdminStocksPage from "./pages/AdminStocksPage";
-import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminMarketPage from "./pages/AdminMarketPage";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import MaintenancePage from "./pages/MaintenancePage";
 import MaintenanceGuard from "./components/MaintenanceGuard";
 import Feedback from "./pages/Feedback";
-import AdminFeedbackPage from "./pages/AdminFeedbackPage";
+import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
+import MarketInsights from "./pages/MarketInsights";
+import AdminAuditLogsPage from "./pages/AdminAuditLogsPage";
+import AdminBackupRestorePage from "./pages/AdminBackupRestorePage";
+import AdminContentMarketPage from "./pages/AdminContentMarketPage";
+import TraderHolidaysPage from "./pages/TraderHolidaysPage";
 
 function App() {
   return (
@@ -80,6 +84,11 @@ function App() {
         <Route
           path="/ai-assistant"
           element={<AiAssistant />}
+        />
+
+        <Route
+          path="/market-insights"
+          element={<MarketInsights />}
         />
 
         <Route
@@ -133,18 +142,33 @@ function App() {
         />
 
         <Route
-          path="/admin/reports"
-          element={<AdminReportsPage />}
-        />
-
-        <Route
           path="/admin/settings"
           element={<AdminSettingsPage />}
         />
 
         <Route
-          path="/admin/feedback"
-          element={<AdminFeedbackPage />}
+          path="/admin/analytics"
+          element={<AdminAnalyticsPage />}
+        />
+
+        <Route
+          path="/admin/audit-logs"
+          element={<AdminAuditLogsPage />}
+        />
+
+        <Route
+          path="/admin/backup-restore"
+          element={<AdminBackupRestorePage />}
+        />
+
+        <Route
+          path="/admin/content-market"
+          element={<AdminContentMarketPage />}
+        />
+
+        <Route
+          path="/market-holidays"
+          element={<TraderHolidaysPage />}
         />
 
         <Route

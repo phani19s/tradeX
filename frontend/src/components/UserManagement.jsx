@@ -1,5 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "react-toastify";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend
+} from "recharts";
 import api from "../api/api";
 import { getAuthHeaders } from "../api/authApi";
 
@@ -29,6 +41,70 @@ export default function UserManagement() {
 
   // Modals state
   const [detailsModal, setDetailsModal] = useState({ isOpen: false, user: null });
+  const [activityModal, setActivityModal] = useState({ isOpen: false, userId: null, username: "", activity: null, loading: false });
+  const [activeActivityTab, setActiveActivityTab] = useState("trades");
+
+  const tradeChartData = useMemo(() => {
+    if (!activityModal.activity || !activityModal.activity.trades) return [];
+    const groups = {};
+    activityModal.activity.trades.forEach(t => {
+      const dateStr = new Date(t.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const value = Number(t.price) * Number(t.quantity);
+      if (!groups[dateStr]) {
+        groups[dateStr] = { label: dateStr, volume: 0, count: 0 };
+      }
+      groups[dateStr].volume += value;
+      groups[dateStr].count += t.quantity;
+    });
+    return Object.values(groups).reverse();
+  }, [activityModal.activity]);
+
+  const depositChartData = useMemo(() => {
+    if (!activityModal.activity || !activityModal.activity.deposits) return [];
+    const groups = {};
+    activityModal.activity.deposits.forEach(d => {
+      const dateStr = new Date(d.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      if (!groups[dateStr]) {
+        groups[dateStr] = { label: dateStr, amount: 0 };
+      }
+      groups[dateStr].amount += Number(d.amount);
+    });
+    return Object.values(groups).reverse();
+  }, [activityModal.activity]);
+
+  const withdrawalChartData = useMemo(() => {
+    if (!activityModal.activity || !activityModal.activity.withdrawals) return [];
+    const groups = {};
+    activityModal.activity.withdrawals.forEach(w => {
+      const dateStr = new Date(w.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      if (!groups[dateStr]) {
+        groups[dateStr] = { label: dateStr, amount: 0 };
+      }
+      groups[dateStr].amount += Number(w.amount);
+    });
+    return Object.values(groups).reverse();
+  }, [activityModal.activity]);
+
+  const watchlistChartData = useMemo(() => {
+    if (!activityModal.activity || !activityModal.activity.watchlist) return [];
+    return activityModal.activity.watchlist.map(w => ({
+      label: w.stock_symbol,
+      price: Number(w.current_price)
+    }));
+  }, [activityModal.activity]);
+
+  const ticketsChartData = useMemo(() => {
+    if (!activityModal.activity || !activityModal.activity.tickets) return [];
+    const groups = {};
+    activityModal.activity.tickets.forEach(t => {
+      const dateStr = new Date(t.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      if (!groups[dateStr]) {
+        groups[dateStr] = { label: dateStr, count: 0 };
+      }
+      groups[dateStr].count += 1;
+    });
+    return Object.values(groups).reverse();
+  }, [activityModal.activity]);
   const [historyModal, setHistoryModal] = useState({ isOpen: false, userId: null, history: [], loading: false });
   const [resetModal, setResetModal] = useState({ isOpen: false, userId: null, email: "", otp: "", newPassword: "", step: 1, loading: false });
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, userId: null, username: "", loading: false });
@@ -85,6 +161,18 @@ export default function UserManagement() {
       setDetailsModal({ isOpen: true, user: response.data });
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to load user details");
+    }
+  }
+
+  // Action: View Activity
+  async function handleViewActivity(userId, username) {
+    try {
+      setActivityModal({ isOpen: true, userId, username, activity: null, loading: true });
+      const response = await api.get(`/admin/users/${userId}/activity`, getAuthHeaders());
+      setActivityModal(prev => ({ ...prev, activity: response.data, loading: false }));
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to load user activity");
+      setActivityModal(prev => ({ ...prev, isOpen: false, loading: false }));
     }
   }
 
@@ -279,6 +367,7 @@ export default function UserManagement() {
                     <div>Actions</div>
                     <div className="flex justify-center items-center gap-1.5 mt-1 text-[9px] font-semibold opacity-65" style={{ textTransform: "none" }}>
                       <span className="w-[30px] text-center" title="View Details">View</span>
+                      <span className="w-[30px] text-center" title="Trader Activity">Activity</span>
                       <span className="w-[30px] text-center" title="Login History">History</span>
                       <span className="w-[30px] text-center" title="Reset Password">Reset</span>
                       <span className="w-[30px] text-center" title="Force Logout">Logout</span>
@@ -330,6 +419,18 @@ export default function UserManagement() {
                           <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        </button>
+
+                        {/* Trader Activity */}
+                        <button
+                          onClick={() => handleViewActivity(u.id, u.username)}
+                          className="p-1.5 rounded-lg hover:bg-surface border border-transparent transition cursor-pointer"
+                          title="Trader Activity"
+                          style={{ borderColor: "var(--border)" }}
+                        >
+                          <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                           </svg>
                         </button>
 
@@ -461,6 +562,402 @@ export default function UserManagement() {
               <button
                 onClick={() => setDetailsModal({ isOpen: false, user: null })}
                 className="rounded-xl border px-5 py-2 text-sm font-semibold hover:bg-surface transition"
+                style={{ borderColor: "var(--border)" }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- TRADER ACTIVITY MODAL --- */}
+      {activityModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl rounded-2xl p-6 shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in duration-200" style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)" }}>
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-center border-b pb-4 mb-4" style={{ borderColor: "var(--border)" }}>
+              <div>
+                <h3 className="text-xl font-bold">Trader Activity: {activityModal.username}</h3>
+                <p className="text-xs opacity-60 mt-1">Review comprehensive records for this trader account</p>
+              </div>
+              <button onClick={() => setActivityModal(prev => ({ ...prev, isOpen: false }))} className="p-1 rounded-lg hover:bg-surface opacity-70 hover:opacity-100 cursor-pointer">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            {activityModal.loading ? (
+              <div className="flex justify-center items-center py-20 flex-1">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-3 border-accent" style={{ borderColor: "var(--accent)" }}></div>
+                <span className="ml-3 font-semibold">Loading activity logs...</span>
+              </div>
+            ) : activityModal.activity ? (
+              <div className="flex min-h-0 flex-1 flex-col">
+                {/* Dynamic Context-Sensitive Graph for each tab */}
+                <div className="shrink-0">
+                  {(() => {
+                  if (activeActivityTab === "trades") {
+                    return (
+                      <div className="mb-6 p-4 rounded-xl border bg-surface/20 animate-in fade-in duration-150" style={{ borderColor: "var(--border)" }}>
+                        <h4 className="text-xs font-bold uppercase tracking-wider mb-3 opacity-70">Trading Volume History</h4>
+                        <div style={{ width: "100%", height: 180 }}>
+                          {tradeChartData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-xs opacity-50">
+                              No trade history to chart.
+                            </div>
+                          ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={tradeChartData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                                <defs>
+                                  <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.4}/>
+                                    <stop offset="95%" stopColor="var(--accent)" stopOpacity={0.0}/>
+                                  </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                                <XAxis dataKey="label" stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <YAxis stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <Tooltip 
+                                  contentStyle={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }} 
+                                  formatter={(value) => [`₹${formatMoney(value)}`, "Volume"]}
+                                />
+                                <Area type="monotone" dataKey="volume" stroke="var(--accent)" fillOpacity={1} fill="url(#colorVolume)" strokeWidth={2} />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  } else if (activeActivityTab === "deposits") {
+                    return (
+                      <div className="mb-6 p-4 rounded-xl border bg-surface/20 animate-in fade-in duration-150" style={{ borderColor: "var(--border)" }}>
+                        <h4 className="text-xs font-bold uppercase tracking-wider mb-3 opacity-70">Deposit Volume History</h4>
+                        <div style={{ width: "100%", height: 180 }}>
+                          {depositChartData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-xs opacity-50">
+                              No deposits to chart.
+                            </div>
+                          ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={depositChartData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                                <XAxis dataKey="label" stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <YAxis stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <Tooltip 
+                                  contentStyle={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }} 
+                                  formatter={(value) => [`₹${formatMoney(value)}`, "Deposited"]}
+                                />
+                                <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  } else if (activeActivityTab === "withdrawals") {
+                    return (
+                      <div className="mb-6 p-4 rounded-xl border bg-surface/20 animate-in fade-in duration-150" style={{ borderColor: "var(--border)" }}>
+                        <h4 className="text-xs font-bold uppercase tracking-wider mb-3 opacity-70">Withdrawal Volume History</h4>
+                        <div style={{ width: "100%", height: 180 }}>
+                          {withdrawalChartData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-xs opacity-50">
+                              No withdrawals to chart.
+                            </div>
+                          ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={withdrawalChartData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                                <XAxis dataKey="label" stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <YAxis stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <Tooltip 
+                                  contentStyle={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }} 
+                                  formatter={(value) => [`₹${formatMoney(value)}`, "Withdrawn"]}
+                                />
+                                <Bar dataKey="amount" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  } else if (activeActivityTab === "watchlist") {
+                    return (
+                      <div className="mb-6 p-4 rounded-xl border bg-surface/20 animate-in fade-in duration-150" style={{ borderColor: "var(--border)" }}>
+                        <h4 className="text-xs font-bold uppercase tracking-wider mb-3 opacity-70">Watchlist Value Overview</h4>
+                        <div style={{ width: "100%", height: 180 }}>
+                          {watchlistChartData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-xs opacity-50">
+                              No watchlist stocks to chart.
+                            </div>
+                          ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={watchlistChartData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                                <XAxis dataKey="label" stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <YAxis stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <Tooltip 
+                                  contentStyle={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }} 
+                                  formatter={(value) => [`₹${formatMoney(value)}`, "Stock Price"]}
+                                />
+                                <Bar dataKey="price" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  } else if (activeActivityTab === "tickets") {
+                    return (
+                      <div className="mb-6 p-4 rounded-xl border bg-surface/20 animate-in fade-in duration-150" style={{ borderColor: "var(--border)" }}>
+                        <h4 className="text-xs font-bold uppercase tracking-wider mb-3 opacity-70">Support Tickets Count History</h4>
+                        <div style={{ width: "100%", height: 180 }}>
+                          {ticketsChartData.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-xs opacity-50">
+                              No tickets to chart.
+                            </div>
+                          ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={ticketsChartData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                                <XAxis dataKey="label" stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <YAxis stroke="var(--text)" opacity={0.9} fontSize={10} tickLine={false} />
+                                <Tooltip 
+                                  contentStyle={{ background: "var(--card)", borderColor: "var(--border)", color: "var(--text)" }} 
+                                  formatter={(value) => [value, "Tickets"]}
+                                />
+                                <Bar dataKey="count" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                  })()}
+                </div>
+
+                {/* Tabs Selector */}
+                <div className="mb-4 flex shrink-0 overflow-x-auto border-b" style={{ borderColor: "var(--border)" }}>
+                  {[
+                    { id: "trades", label: `Trades (${activityModal.activity.trades.length})` },
+                    { id: "deposits", label: `Deposits (${activityModal.activity.deposits.length})` },
+                    { id: "withdrawals", label: `Withdrawals (${activityModal.activity.withdrawals.length})` },
+                    { id: "watchlist", label: `Watchlist (${activityModal.activity.watchlist.length})` },
+                    { id: "tickets", label: `Tickets (${activityModal.activity.tickets.length})` }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveActivityTab(tab.id)}
+                      className={`px-5 py-3 text-xs font-bold whitespace-nowrap border-b-2 transition cursor-pointer`}
+                      style={{
+                        color: activeActivityTab === tab.id ? "var(--accent)" : "var(--text)",
+                        borderColor: activeActivityTab === tab.id ? "var(--accent)" : "transparent",
+                        opacity: activeActivityTab === tab.id ? 1.0 : 0.75
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab Content */}
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm">
+                  {/* Trades Tab */}
+                  {activeActivityTab === "trades" && (
+                    <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                      <table className="w-full">
+                        <thead className="sticky top-0 z-10" style={{ background: "var(--card)" }}>
+                          <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                            <th className="px-4 py-3">Stock</th>
+                            <th className="px-4 py-3">Type</th>
+                            <th className="px-4 py-3 text-right">Quantity</th>
+                            <th className="px-4 py-3 text-right">Price</th>
+                            <th className="px-4 py-3 text-right">Total Value</th>
+                            <th className="px-4 py-3">Execution Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+                          {activityModal.activity.trades.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center opacity-50">No trades executed by this trader.</td>
+                            </tr>
+                          ) : (
+                            activityModal.activity.trades.map((t, idx) => (
+                              <tr key={idx} className="hover:bg-surface/10">
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-accent">{t.stock_symbol}</span>
+                                    <span className="text-[10px] opacity-60">{t.stock_name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    t.trade_type === "BUY" ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                                  }`}>{t.trade_type}</span>
+                                </td>
+                                <td className="px-4 py-3 text-right font-medium">{t.quantity}</td>
+                                <td className="px-4 py-3 text-right">₹{formatMoney(t.price)}</td>
+                                <td className="px-4 py-3 text-right font-bold">₹{formatMoney(t.price * t.quantity)}</td>
+                                <td className="px-4 py-3 opacity-75">{new Date(t.created_at).toLocaleString()}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Deposits Tab */}
+                  {activeActivityTab === "deposits" && (
+                    <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                            <th className="px-4 py-3">Amount</th>
+                            <th className="px-4 py-3">Method</th>
+                            <th className="px-4 py-3">UTR Number</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">Created At</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+                          {activityModal.activity.deposits.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-4 py-8 text-center opacity-50">No deposits recorded.</td>
+                            </tr>
+                          ) : (
+                            activityModal.activity.deposits.map((d, idx) => (
+                              <tr key={idx} className="hover:bg-surface/10">
+                                <td className="px-4 py-3 font-extrabold text-emerald-500">₹{formatMoney(d.amount)}</td>
+                                <td className="px-4 py-3">{d.payment_type}</td>
+                                <td className="px-4 py-3 opacity-80">{d.utr_number || "-"}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                                    d.status === "Approved" ? "bg-emerald-500/10 text-emerald-500" :
+                                    d.status === "Rejected" ? "bg-rose-500/10 text-rose-500" : "bg-amber-500/10 text-amber-500"
+                                  }`}>{d.status}</span>
+                                </td>
+                                <td className="px-4 py-3 opacity-75">{new Date(d.created_at).toLocaleString()}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Withdrawals Tab */}
+                  {activeActivityTab === "withdrawals" && (
+                    <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                      <table className="w-full">
+                        <thead className="sticky top-0 z-10" style={{ background: "var(--card)" }}>
+                          <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                            <th className="px-4 py-3">Amount</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">Created At</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+                          {activityModal.activity.withdrawals.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="px-4 py-8 text-center opacity-50">No payouts/withdrawals recorded.</td>
+                            </tr>
+                          ) : (
+                            activityModal.activity.withdrawals.map((w, idx) => (
+                              <tr key={idx} className="hover:bg-surface/10">
+                                <td className="px-4 py-3 font-extrabold text-rose-500">₹{formatMoney(w.amount)}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                                    w.status === "Approved" ? "bg-emerald-500/10 text-emerald-500" :
+                                    w.status === "Rejected" ? "bg-rose-500/10 text-rose-500" : "bg-amber-500/10 text-amber-500"
+                                  }`}>{w.status}</span>
+                                </td>
+                                <td className="px-4 py-3 opacity-75">{new Date(w.created_at).toLocaleString()}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Watchlist Tab */}
+                  {activeActivityTab === "watchlist" && (
+                    <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                      <table className="w-full">
+                        <thead className="sticky top-0 z-10" style={{ background: "var(--card)" }}>
+                          <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                            <th className="px-4 py-3">Stock Symbol</th>
+                            <th className="px-4 py-3">Company Name</th>
+                            <th className="px-4 py-3 text-right">Current Price</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+                          {activityModal.activity.watchlist.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="px-4 py-8 text-center opacity-50">No watchlist entries for this trader.</td>
+                            </tr>
+                          ) : (
+                            activityModal.activity.watchlist.map((w, idx) => (
+                              <tr key={idx} className="hover:bg-surface/10">
+                                <td className="px-4 py-3 font-bold text-accent">{w.stock_symbol}</td>
+                                <td className="px-4 py-3">{w.stock_name}</td>
+                                <td className="px-4 py-3 text-right font-semibold">₹{formatMoney(w.current_price)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Support Tickets Tab */}
+                  {activeActivityTab === "tickets" && (
+                    <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                            <th className="px-4 py-3">Ticket ID</th>
+                            <th className="px-4 py-3">Issue Type</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">Created At</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y" style={{ borderColor: "var(--border)" }}>
+                          {activityModal.activity.tickets.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-8 text-center opacity-50">No support tickets created by this trader.</td>
+                            </tr>
+                          ) : (
+                            activityModal.activity.tickets.map((t, idx) => (
+                              <tr key={idx} className="hover:bg-surface/10">
+                                <td className="px-4 py-3 font-bold text-accent">{t.ticket_number}</td>
+                                <td className="px-4 py-3">{t.issue_type}</td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                                    t.status === "RESOLVED" || t.status === "CLOSED" ? "bg-emerald-500/10 text-emerald-500" :
+                                    t.status === "IN_PROGRESS" ? "bg-blue-500/10 text-blue-500" : "bg-amber-500/10 text-amber-500"
+                                  }`}>{t.status}</span>
+                                </td>
+                                <td className="px-4 py-3 opacity-75">{new Date(t.created_at).toLocaleString()}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Modal Footer */}
+            <div className="flex justify-end gap-3 border-t pt-4 mt-4" style={{ borderColor: "var(--border)" }}>
+              <button
+                onClick={() => setActivityModal(prev => ({ ...prev, isOpen: false }))}
+                className="rounded-xl border px-5 py-2 text-sm font-semibold hover:bg-surface transition cursor-pointer"
                 style={{ borderColor: "var(--border)" }}
               >
                 Close

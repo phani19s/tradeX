@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from datetime import datetime
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.dependencies import get_db
 from app.models.portfolio import Portfolio 
@@ -145,7 +145,11 @@ def deposit_history(
     db: Session = Depends(get_db)
 ):
 
-    query = db.query(Deposit)
+    query = db.query(Deposit).options(
+        joinedload(Deposit.user),
+        joinedload(Deposit.created_by),
+        joinedload(Deposit.verified_by)
+    )
 
     if not current_user.is_admin:
         query = query.filter(Deposit.user_id == current_user.id)
@@ -155,24 +159,6 @@ def deposit_history(
     history = []
 
     for deposit in deposits:
-        target_user = (
-            db.query(User)
-            .filter(User.id == deposit.user_id)
-            .first()
-        )
-
-        created_by = (
-            db.query(User)
-            .filter(User.id == deposit.created_by_id)
-            .first()
-        )
-
-        verified_by = (
-            db.query(User)
-            .filter(User.id == deposit.verified_by_id)
-            .first()
-        )
-
         history.append(
             {
                 "id": deposit.id,
@@ -182,9 +168,9 @@ def deposit_history(
                 "status": deposit.status,
                 "created_at": deposit.created_at.isoformat(),
                 "verified_at": deposit.verified_at.isoformat() if deposit.verified_at else None,
-                "target_email": target_user.email if target_user else None,
-                "created_by_email": created_by.email if created_by else None,
-                "verified_by_email": verified_by.email if verified_by else None,
+                "target_email": deposit.user.email if deposit.user else None,
+                "created_by_email": deposit.created_by.email if deposit.created_by else None,
+                "verified_by_email": deposit.verified_by.email if deposit.verified_by else None,
             }
         )
 

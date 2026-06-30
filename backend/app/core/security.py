@@ -221,8 +221,21 @@ def _get_authenticated_entities(
         )
 
         db.add(session)
-        db.commit()
-        db.refresh(session)
+        from sqlalchemy.exc import IntegrityError
+        try:
+            db.commit()
+            db.refresh(session)
+        except IntegrityError:
+            db.rollback()
+            session = (
+                db.query(UserSession)
+                .filter(
+                    UserSession.session_token_id == session_token_id
+                )
+                .first()
+            )
+            if session is None:
+                raise credentials_exception
 
     now = datetime.utcnow()
     last_activity = session.last_activity or session.created_at or now

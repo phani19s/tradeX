@@ -21,11 +21,17 @@ def get_holdings(db: Session, user_id: int):
         .all()
     )
 
+    if not trades:
+        return {}
+
+    # Fetch all stocks in a single query
+    stocks_map = {s.id: s for s in db.query(Stock).all()}
+
     holdings = {}
     buy_prices = {}
 
     for trade in trades:
-        stock = db.query(Stock).filter(Stock.id == trade.stock_id).first()
+        stock = stocks_map.get(trade.stock_id)
         if not stock:
             continue
 
@@ -58,6 +64,12 @@ def get_portfolio_growth(db: Session, user_id: int):
         .order_by(Trade.id.asc())
         .all()
     )
+    if not trades:
+        return []
+
+    # Fetch all stocks in a single query
+    stocks_map = {s.id: s for s in db.query(Stock).all()}
+    
     holdings = defaultdict(int)
     points = []
 
@@ -69,7 +81,7 @@ def get_portfolio_growth(db: Session, user_id: int):
 
         value = 0
         for stock_id, quantity in holdings.items():
-            stock = db.query(Stock).filter(Stock.id == stock_id).first()
+            stock = stocks_map.get(stock_id)
             if stock and quantity > 0:
                 value += quantity * stock.current_price
 

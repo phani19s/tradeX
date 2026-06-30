@@ -48,12 +48,44 @@ def get_owned_quantity(
     return quantity
 
 
+def check_market_holiday_status(db: Session):
+    import datetime
+    from app.models.holiday import MarketHoliday
+    now = datetime.datetime.now()
+    today_start = datetime.datetime(now.year, now.month, now.day)
+    today_end = today_start + datetime.timedelta(days=1)
+    
+    holiday = (
+        db.query(MarketHoliday)
+        .filter(MarketHoliday.is_active == True)
+        .filter(MarketHoliday.date >= today_start)
+        .filter(MarketHoliday.date < today_end)
+        .first()
+    )
+    
+    if holiday:
+        if holiday.market_status == "Closed":
+            return False, "Trading is unavailable today due to a market holiday."
+        elif holiday.market_status == "Muhurat Trading":
+            current_time_str = now.strftime("%H:%M")
+            start = holiday.start_time or "00:00"
+            end = holiday.end_time or "00:00"
+            if start <= current_time_str <= end:
+                return True, ""
+            else:
+                return False, f"Muhurat Trading is only available from {start} to {end} today."
+    return True, ""
+
+
 @router.post("/buy")
 def buy_stock(
     trade: TradeCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    allowed, msg = check_market_holiday_status(db)
+    if not allowed:
+        raise HTTPException(status_code=400, detail=msg)
 
     user_id = current_user.id
 
@@ -123,6 +155,9 @@ def sell_stock(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    allowed, msg = check_market_holiday_status(db)
+    if not allowed:
+        raise HTTPException(status_code=400, detail=msg)
 
     user_id = current_user.id
 
@@ -342,6 +377,9 @@ def set_limit_buy(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    allowed, msg = check_market_holiday_status(db)
+    if not allowed:
+        raise HTTPException(status_code=400, detail=msg)
     # Check if stock exists
     stock = db.query(Stock).filter(Stock.id == payload.stock_id).first()
     if not stock:
@@ -370,6 +408,9 @@ def set_sl_tp(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    allowed, msg = check_market_holiday_status(db)
+    if not allowed:
+        raise HTTPException(status_code=400, detail=msg)
     # Check if stock exists
     stock = db.query(Stock).filter(Stock.id == payload.stock_id).first()
     if not stock:

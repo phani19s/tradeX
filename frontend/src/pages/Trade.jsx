@@ -62,6 +62,14 @@ function Trade() {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
 
+  const [holidayStatus, setHolidayStatus] = useState({
+    isClosed: false,
+    isMuhurat: false,
+    muhuratHours: "",
+    holidayName: "",
+    noticeMsg: ""
+  });
+
   const fetchPortfolioSummary = async () => {
     try {
       const response = await api.get("/portfolio/summary", getAuthHeaders());
@@ -80,9 +88,56 @@ function Trade() {
     }
   };
 
+  const checkHolidays = async () => {
+    try {
+      const res = await api.get("/admin/holidays/upcoming", getAuthHeaders());
+      const upcoming = res.data || [];
+      const todayStr = new Date().toISOString().split("T")[0];
+      
+      const todayHoliday = upcoming.find(h => h.date.split("T")[0] === todayStr);
+      if (todayHoliday) {
+        if (todayHoliday.market_status === "Closed") {
+          setHolidayStatus({
+            isClosed: true,
+            isMuhurat: false,
+            muhuratHours: "",
+            holidayName: todayHoliday.name,
+            noticeMsg: "Trading is unavailable today due to a market holiday."
+          });
+        } else if (todayHoliday.market_status === "Muhurat Trading") {
+          const now = new Date();
+          const currentStr = now.toLocaleTimeString("en-IN", { hour12: false }).substring(0, 5); // "HH:MM"
+          const start = todayHoliday.start_time || "00:00";
+          const end = todayHoliday.end_time || "00:00";
+          
+          if (currentStr >= start && currentStr <= end) {
+            setHolidayStatus({
+              isClosed: false,
+              isMuhurat: true,
+              muhuratHours: `${start} - ${end}`,
+              holidayName: todayHoliday.name,
+              noticeMsg: `Muhurat Trading is ACTIVE from ${start} to ${end} today.`
+            });
+          } else {
+            setHolidayStatus({
+              isClosed: true,
+              isMuhurat: true,
+              muhuratHours: `${start} - ${end}`,
+              holidayName: todayHoliday.name,
+              noticeMsg: `Trading is currently closed. Muhurat session is scheduled from ${start} to ${end} today.`
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchHoldings();
     fetchPortfolioSummary();
+    checkHolidays();
   }, []);
 
   const cards = useMemo(() => {
@@ -117,6 +172,14 @@ function Trade() {
     [stockOptions, selectedStock]
   );
 
+  useEffect(() => {
+    if (selectedStockData && !selectedStockData.is_active) {
+      setSelectedStock("");
+      setQuantity("");
+      setLimitPrice("");
+    }
+  }, [selectedStockData]);
+
   const selectedHolding = useMemo(() => {
     if (!selectedStockData) return null;
     return holdings.find((h) => h.symbol === selectedStockData.symbol);
@@ -143,7 +206,7 @@ function Trade() {
     [selectedStockData, marketStats]
   );
 
-  const canTrade = Boolean(selectedStock) && Number(quantity) > 0;
+  const canTrade = Boolean(selectedStockData?.is_active) && Number(quantity) > 0 && !holidayStatus.isClosed;
 
   const buyStock = async () => {
     try {
@@ -160,8 +223,8 @@ function Trade() {
       setQuantity("");
       fetchHoldings();
       fetchPortfolioSummary();
-    } catch {
-      toast.error("Buy Failed");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Buy Failed");
     }
   };
 
@@ -216,6 +279,21 @@ function Trade() {
       <Navbar />
 
       <div className="theme-main px-4 py-6 md:px-6">
+        {holidayStatus.noticeMsg && (
+          <div className={`mb-6 border rounded-3xl p-5 flex gap-4 items-center shadow-md animate-in slide-in-from-top-2 duration-200 ${
+            holidayStatus.isClosed 
+              ? "border-red-500/20 bg-red-500/10 text-red-500" 
+              : "border-amber-500/20 bg-amber-500/10 text-amber-500"
+          }`}>
+            <span className="text-2xl">{holidayStatus.isClosed ? "🚫" : "🪔"}</span>
+            <div>
+              <h4 className="font-bold text-base">{holidayStatus.holidayName} Notification</h4>
+              <p className="text-sm mt-0.5 opacity-90 leading-relaxed font-semibold">
+                {holidayStatus.noticeMsg}
+              </p>
+            </div>
+          </div>
+        )}
         <div
           className="mb-6 rounded-3xl border p-6 shadow-lg"
           style={{
@@ -323,8 +401,9 @@ function Trade() {
                 <button
                   key={stock.id}
                   type="button"
+                  disabled={!stock.is_active}
                   onClick={() => setSelectedStock(String(stock.id))}
-                  className="rounded-3xl border p-5 text-left shadow-lg transition hover:-translate-y-1"
+                  className="rounded-3xl border p-5 text-left shadow-lg transition enabled:hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-55"
                   style={{
                     background: isSelected ? "var(--accent-soft)" : "var(--card)",
                     borderColor: isSelected ? "var(--accent-border)" : "var(--border)",
@@ -339,7 +418,7 @@ function Trade() {
                           color: "var(--accent)",
                         }}
                       >
-                        {isSelected ? "Selected" : (owned > 0 ? `Owned: ${owned}` : "Stock")}
+                        {!stock.is_active ? "Disabled" : isSelected ? "Selected" : (owned > 0 ? `Owned: ${owned}` : "Stock")}
                       </div>
                       <h3 className="mt-3 text-2xl font-black">{stock.symbol}</h3>
                     </div>
@@ -443,7 +522,7 @@ function Trade() {
                       <span className={`text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-lg ${stockAdvice.bg} ${stockAdvice.color} border border-current/10`}>
                         {stockAdvice.label}
                       </span>
-                      {selectedStockData && (
+                      {selectedStockData?.is_active && (
                           <div className="flex flex-col items-end gap-1.5">
                             <input
                               type="number"
@@ -464,7 +543,7 @@ function Trade() {
                             />
                             <button
                               onClick={setLimitBuy}
-                              disabled={!selectedStock || !limitPrice || !quantity || loading}
+                              disabled={!selectedStockData?.is_active || !limitPrice || !quantity || loading}
                               className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg hover:opacity-90 disabled:opacity-50 transition"
                               style={{
                                 background: "var(--accent)",
@@ -518,8 +597,8 @@ function Trade() {
                   const holding = holdings.find((h) => h.symbol === stock.symbol);
                   const owned = holding ? holding.quantity : 0;
                   return (
-                    <option key={stock.id} value={stock.id}>
-                      {stock.symbol} - {stock.company_name} {owned > 0 ? `(Owned: ${owned})` : ""}
+                    <option key={stock.id} value={stock.id} disabled={!stock.is_active}>
+                      {stock.symbol} - {stock.company_name} {!stock.is_active ? "(Disabled)" : owned > 0 ? `(Owned: ${owned})` : ""}
                     </option>
                   );
                 })}
