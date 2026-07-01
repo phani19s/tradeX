@@ -21,4 +21,4 @@ while True:
             e
         )
 
-    time.sleep(0.5)
+    time.sleep(3.0)

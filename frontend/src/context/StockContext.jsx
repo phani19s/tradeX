@@ -45,7 +45,7 @@ export function StockProvider({
     const timer =
       setInterval(
         fetchStocks,
-        500
+        3000
       );
 
     return () =>

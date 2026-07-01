@@ -1,24 +1,29 @@
 import os
-import smtplib
-import ssl
-
+import requests
+import logging
 from datetime import datetime
 from datetime import timedelta
-from email.mime.text import MIMEText
+from email.utils import parseaddr
 
 from dotenv import load_dotenv
 from jose import jwt
+from fastapi import HTTPException
 
 from app.core.config import ALGORITHM
 from app.core.config import SECRET_KEY
 
 load_dotenv()
 
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "TradeX <tradex.support@gmail.com>")
+EMAIL_REPLY_TO = os.getenv("EMAIL_REPLY_TO", "tradex.support@gmail.com")
 APPROVAL_EMAIL = os.getenv("TRADEX_APPROVAL_EMAIL", "tradex.adminn@gmail.com")
 APP_BASE_URL = os.getenv("TRADEX_FRONTEND_URL", "http://localhost:5173")
 API_BASE_URL = os.getenv("TRADEX_API_URL", "http://127.0.0.1:8000")
+
+# Setup logging
+logger = logging.getLogger("email_service")
+
 
 
 def create_action_token(item_id: int, action: str, prefix: str):
@@ -276,55 +281,105 @@ def send_withdrawal_rejected_email(
     _send_html_email(recipient_email, subject, html)
 
 
+def parse_email_sender(email_str: str, default_name: str = "TradeX"):
+    name, email = parseaddr(email_str)
+    return {
+        "name": name or default_name,
+        "email": email or email_str
+    }
+
+
+class EmailDeliveryError(Exception):
+    """Exception raised when email delivery fails."""
+    pass
+
+
+def parse_email_sender(email_str: str, default_name: str = "TradeX"):
+    name, email = parseaddr(email_str)
+    return {
+        "name": name or default_name,
+        "email": email or email_str
+    }
+
+
 def _send_html_email(to_email: str, subject: str, body: str, reply_to: str | None = None):
-    if not EMAIL_ADDRESS or not EMAIL_PASSWORD:
-        raise RuntimeError(
-            "Email credentials are not configured. "
-            "Set EMAIL_ADDRESS and EMAIL_PASSWORD in backend/.env."
+    # Validate configurations
+    if not BREVO_API_KEY:
+        raise HTTPException(status_code=500, detail="BREVO_API_KEY is not configured in backend/.env")
+    if not EMAIL_FROM:
+        raise HTTPException(status_code=500, detail="EMAIL_FROM is not configured in backend/.env")
+
+    # Detect if user provided an SMTP key instead of a REST API key
+    if BREVO_API_KEY.startswith("xsmtpsib-"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Your BREVO_API_KEY starts with 'xsmtpsib-', which is an SMTP key. "
+                "For the Brevo REST API to work on Render, you must use a REST API key starting with 'xkeysib-'. "
+                "Please go to your Brevo account → 'SMTP & API' → 'API Keys' tab, generate a new key, "
+                "and update BREVO_API_KEY in your backend/.env file."
+            )
         )
 
-    msg = MIMEText(body, "html")
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_ADDRESS
-    msg["To"] = to_email
+    # Parse sender and replyTo
+    sender_info = parse_email_sender(EMAIL_FROM, "TradeX")
+    
+    # reply_to override or default REPLY_TO
+    reply_to_str = reply_to or EMAIL_REPLY_TO
+    reply_to_info = parse_email_sender(reply_to_str, "TradeX")
 
-    if reply_to:
-        msg["Reply-To"] = reply_to
+    headers = {
+        "api-key": BREVO_API_KEY,
+        "Content-Type": "application/json"
+    }
 
-    last_error = None
-    attempts = [
-        ("smtp.gmail.com", 587, False),
-        ("smtp.gmail.com", 465, True),
-    ]
+    payload = {
+        "sender": sender_info,
+        "to": [{"email": to_email}],
+        "replyTo": reply_to_info,
+        "subject": subject,
+        "htmlContent": body
+    }
 
-    for host, port, use_ssl in attempts:
-        server = None
-        try:
-            if use_ssl:
-                context = ssl.create_default_context()
-                server = smtplib.SMTP_SSL(host, port, context=context, timeout=20)
-            else:
-                server = smtplib.SMTP(host, port, timeout=20)
-                server.ehlo()
-                server.starttls(context=ssl.create_default_context())
-                server.ehlo()
+    url = "https://api.brevo.com/v3/smtp/email"
+    timestamp = datetime.utcnow().isoformat()
+    logger.info(
+        f"Sending email via Brevo REST API - Recipient: {to_email}, Type: {subject}, Status: PENDING, Timestamp: {timestamp}"
+    )
 
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_ADDRESS, to_email, msg.as_string())
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        status_code = response.status_code
+        response_body = response.text
+        
+        if 200 <= status_code < 300:
+            try:
+                res_data = response.json()
+                message_id = res_data.get("messageId", "Unknown ID")
+            except:
+                message_id = "Unknown ID"
+                
+            logger.info(
+                f"Email sent successfully - Recipient: {to_email}, Type: {subject}, Subject: {subject}, Status: SUCCESS, Timestamp: {datetime.utcnow().isoformat()}, HTTP Status: {status_code}, Brevo Response ID: {message_id}"
+            )
             return
-        except Exception as exc:
-            last_error = exc
-        finally:
-            if server is not None:
-                try:
-                    server.quit()
-                except Exception:
-                    pass
-
-    raise RuntimeError(
-        f"Unable to send email to {to_email}. "
-        f"Last SMTP error: {last_error}"
-    ) from last_error
+        else:
+            logger.error(
+                f"Failed to send email - Recipient: {to_email}, Type: {subject}, Subject: {subject}, Status: FAILED, Timestamp: {datetime.utcnow().isoformat()}, HTTP Status: {status_code}, Error: {response_body}"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Email delivery failed (HTTP {status_code}): {response_body}"
+            )
+            
+    except requests.RequestException as e:
+        logger.error(
+            f"Failed to send email - Recipient: {to_email}, Type: {subject}, Subject: {subject}, Status: FAILED, Timestamp: {datetime.utcnow().isoformat()}, Error: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Email service temporarily unavailable: {str(e)}"
+        )
 
 
 def send_deposit_approval_email(
@@ -970,32 +1025,9 @@ def send_price_alert_email(
 
 def send_maintenance_mode_email(is_on: bool):
     from app.core.database import SessionLocal
-    from app.models.system_setting import SystemSetting
     
     db = SessionLocal()
     try:
-        # Load SMTP settings dynamically from DB
-        sender = db.query(SystemSetting).filter(SystemSetting.key == "email_sender").first()
-        server_host = db.query(SystemSetting).filter(SystemSetting.key == "smtp_server").first()
-        port_num = db.query(SystemSetting).filter(SystemSetting.key == "smtp_port").first()
-        user_name = db.query(SystemSetting).filter(SystemSetting.key == "smtp_username").first()
-        password_val = db.query(SystemSetting).filter(SystemSetting.key == "smtp_password").first()
-        
-        from_email = sender.value if (sender and sender.value) else "tradex.adminn@gmail.com"
-        if is_on:
-            from_email = "tradex.support@gmail.com"
-            
-        smtp_host = server_host.value if (server_host and server_host.value) else "smtp.gmail.com"
-        smtp_port = int(port_num.value) if (port_num and port_num.value) else 587
-        smtp_user = user_name.value if (user_name and user_name.value) else "tradex.adminn@gmail.com"
-        smtp_pass = password_val.value if (password_val and password_val.value) else ""
-        
-        if not smtp_pass or smtp_pass in ["your-smtp-password", "********"]:
-            smtp_user = EMAIL_ADDRESS or "tradex.support@gmail.com"
-            smtp_pass = EMAIL_PASSWORD or ""
-            smtp_host = "smtp.gmail.com"
-            smtp_port = 587
-            
         status_text = "ACTIVATED" if is_on else "DEACTIVATED"
         subject = f"TradeX Alert: Maintenance Mode {status_text}"
         
@@ -1027,29 +1059,7 @@ def send_maintenance_mode_email(is_on: bool):
         </html>
         """
         
-        msg = MIMEText(body, "html")
-        msg["Subject"] = subject
-        msg["From"] = from_email
-        msg["To"] = "tradex.adminn@gmail.com"
-        
-        # Connect and send
-        import smtplib
-        import ssl
-        
-        context = ssl.create_default_context()
-        if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=20)
-        else:
-            server = smtplib.SMTP(smtp_host, smtp_port, timeout=20)
-            server.ehlo()
-            server.starttls(context=context)
-            server.ehlo()
-            
-        if smtp_user and smtp_pass and smtp_pass != "********":
-            server.login(smtp_user, smtp_pass)
-            
-        server.sendmail(from_email, "tradex.adminn@gmail.com", msg.as_string())
-        server.quit()
+        _send_html_email("tradex.adminn@gmail.com", subject, body)
         print("Maintenance Mode email notification sent to tradex.adminn@gmail.com successfully.")
     except Exception as e:
         print(f"Failed to send maintenance mode email notification: {e}")

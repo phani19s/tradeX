@@ -227,107 +227,76 @@ return (
 
     </svg>
 
-    <div className="w-[450px] z-10 max-w-full">
-      <ActiveBanners />
-    </div>
+    <div className="flex flex-col gap-4 items-center justify-center z-10 max-w-full px-4">
+      <div className="w-[450px] max-w-full">
+        <ActiveBanners />
+      </div>
 
-    {/* Login Card */}
-
-    <div
-  className="
-  relative
-  z-10
-  overflow-hidden
-  bg-slate-900/60
-  backdrop-blur-md
-  border
-  border-blue-400/20
-  shadow-[0_20px_60px_rgba(0,0,0,0.5)]
-  rounded-3xl
-  p-10
-  w-[450px]
-"
->
-      {/* Glow Effects */}
+      {/* Login Card */}
 
       <div
         className="
-        absolute
-        -top-10
-        -right-10
-        w-40
-        h-40
-        bg-blue-500/30
-        rounded-full
-        blur-3xl
-        animate-pulse
+        relative
+        overflow-hidden
+        bg-slate-900/60
+        backdrop-blur-md
+        border
+        border-blue-400/20
+        shadow-[0_20px_60px_rgba(0,0,0,0.5)]
+        rounded-3xl
+        p-10
+        w-[450px]
+        max-w-full
       "
-      ></div>
+      >
+        {/* Glow Effects */}
 
-      <div
-        className="
-        absolute
-        -bottom-10
-        -left-10
-        w-40
-        h-40
-        bg-purple-500/30
-        rounded-full
-        blur-3xl
-        animate-pulse
-      "
-      ></div>
-
-      <div className="relative z-10">
-
-        <h1 className="text-5xl font-extrabold text-center mb-2 text-white">
-          TradeX
-        </h1>
-
-        <p className="text-center text-blue-200 mb-8">
-          Smart Trading Simulator
-        </p>
-
-        {/* Email */}
-
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) =>
-            setEmail(
-              e.target.value
-            )
-          }
+        <div
           className="
-          w-full
-          bg-white/10
-          border
-          border-white/20
-          text-white
-          placeholder-gray-300
-          p-4
-          rounded-xl
-          mb-4
-          outline-none
-          focus:border-blue-400
+          absolute
+          -top-10
+          -right-10
+          w-40
+          h-40
+          bg-blue-500/30
+          rounded-full
+          blur-3xl
+          animate-pulse
         "
-        />
+        ></div>
 
-        {/* Password */}
+        <div
+          className="
+          absolute
+          -bottom-10
+          -left-10
+          w-40
+          h-40
+          bg-purple-500/30
+          rounded-full
+          blur-3xl
+          animate-pulse
+        "
+        ></div>
 
-        <div className="relative mb-4">
+        <div className="relative z-10">
+
+          <h1 className="text-5xl font-extrabold text-center mb-2 text-white">
+            TradeX
+          </h1>
+
+          <p className="text-center text-blue-200 mb-8">
+            Smart Trading Simulator
+          </p>
+
+          {/* Email */}
 
           <input
-            type={
-              showPassword
-                ? "text"
-                : "password"
-            }
-            placeholder="Password"
-            value={password}
+            type="email"
+            placeholder="Email"
+            value={email}
             onChange={(e) =>
-              setPassword(
+              setEmail(
                 e.target.value
               )
             }
@@ -340,54 +309,26 @@ return (
             placeholder-gray-300
             p-4
             rounded-xl
+            mb-4
             outline-none
             focus:border-blue-400
           "
           />
 
-          <button
-            type="button"
-            onClick={() =>
-              setShowPassword(
-                !showPassword
-              )
-            }
-            className="
-            absolute
-            right-4
-            top-4
-            text-gray-300
-          "
-          >
-            {showPassword
-              ? "🙈"
-              : "👁️"}
-          </button>
+          {/* Password */}
 
-        </div>
+          <div className="relative mb-4">
 
-        <div className="mb-4 text-right">
-          <Link
-            to="/forgot-password"
-            className="text-sm font-semibold text-blue-300 hover:text-blue-200"
-          >
-            Forgot password?
-          </Link>
-        </div>
-
-        {requiresTwoFactor && (
-          <div className="mb-4">
             <input
-              type="text"
-              inputMode="numeric"
-              placeholder={
-                twoFactorMethod === "email"
-                  ? "Email OTP"
-                  : "Google Authenticator Code"
+              type={
+                showPassword
+                  ? "text"
+                  : "password"
               }
-              value={twoFactorOtp}
+              placeholder="Password"
+              value={password}
               onChange={(e) =>
-                setTwoFactorOtp(
+                setPassword(
                   e.target.value
                 )
               }
@@ -404,59 +345,120 @@ return (
               focus:border-blue-400
             "
             />
-            <p className="mt-2 text-sm text-blue-200">
-              {twoFactorMethod === "email"
-                ? "A one-time code was sent to your email."
-                : "Enter the 6-digit code from your authenticator app."}
-            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowPassword(
+                  !showPassword
+                )
+              }
+              className="
+              absolute
+              right-4
+              top-4
+              text-gray-300
+            "
+            >
+              {showPassword
+                ? "🙈"
+                : "👁️"}
+            </button>
+
           </div>
-        )}
 
-        {/* Login Button */}
+          <div className="mb-4 text-right">
+            <Link
+              to="/forgot-password"
+              className="text-sm font-semibold text-blue-300 hover:text-blue-200"
+            >
+              Forgot password?
+            </Link>
+          </div>
 
-        <button
-          onClick={handleLogin}
-          disabled={loading || (requiresTwoFactor && !twoFactorOtp.trim())}
-          className="
-          w-full
-          bg-blue-600
-          text-white
-          p-4
-          rounded-xl
-          hover:bg-blue-700
-          disabled:bg-gray-500
-        "
-        >
-          {
-            loading
-              ? "Logging In..."
-              : requiresTwoFactor
-                ? "Verify & Login"
-                : "Login"
-          }
-        </button>
+          {requiresTwoFactor && (
+            <div className="mb-4">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder={
+                  twoFactorMethod === "email"
+                    ? "Email OTP"
+                    : "Google Authenticator Code"
+                }
+                value={twoFactorOtp}
+                onChange={(e) =>
+                  setTwoFactorOtp(
+                    e.target.value
+                  )
+                }
+                className="
+                w-full
+                bg-white/10
+                border
+                border-white/20
+                text-white
+                placeholder-gray-300
+                p-4
+                rounded-xl
+                outline-none
+                focus:border-blue-400
+              "
+              />
+              <p className="mt-2 text-sm text-blue-200">
+                {twoFactorMethod === "email"
+                  ? "A one-time code was sent to your email."
+                  : "Enter the 6-digit code from your authenticator app."}
+              </p>
+            </div>
+          )}
 
-        {/* Register Link */}
+          {/* Login Button */}
 
-        <p className="mt-6 text-center text-gray-300">
-
-          Don't have an account?
-
-          <Link
-            to="/register"
+          <button
+            onClick={handleLogin}
+            disabled={loading || (requiresTwoFactor && !twoFactorOtp.trim())}
             className="
-            text-blue-400
-            font-semibold
-            ml-2
+            w-full
+            bg-blue-600
+            text-white
+            p-4
+            rounded-xl
+            hover:bg-blue-700
+            disabled:bg-gray-500
           "
           >
-            Register
-          </Link>
+            {
+              loading
+                ? "Logging In..."
+                : requiresTwoFactor
+                  ? "Verify & Login"
+                  : "Login"
+            }
+          </button>
 
-        </p>
+          {/* Register Link */}
+
+          <p className="mt-6 text-center text-gray-300">
+
+            Don't have an account?
+
+            <Link
+              to="/register"
+              className="
+              text-blue-400
+              font-semibold
+              ml-2
+            "
+            >
+              Register
+            </Link>
+
+          </p>
+
+        </div>
 
       </div>
-
     </div>
 
   </div>
