@@ -120,7 +120,12 @@ function SupportManagementAdmin() {
                 ) : (
                   tickets.map(ticket => (
                     <tr key={ticket.id} className="border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                      <td className="px-3 py-4 text-xs font-bold">{ticket.ticket_number}</td>
+                      <td className="px-3 py-4 text-xs font-bold text-left">
+                        <div>{ticket.ticket_number}</div>
+                        <div className="text-[10px] text-gray-400 font-normal mt-0.5" title={ticket.email || ticket.username}>
+                          {ticket.email || ticket.username || `User #${ticket.user_id}`}
+                        </div>
+                      </td>
                       <td className="px-3 py-4 text-xs">{ticket.issue_type}</td>
                       <td className="px-3 py-4 text-xs max-w-[200px] truncate" title={ticket.description}>{ticket.description}</td>
                       <td className="px-3 py-4">

@@ -221,6 +221,7 @@ def portfolio_summary(
 
     trades = (
         db.query(Trade)
+        .options(joinedload(Trade.stock))
         .filter(
             Trade.user_id == user_id
         )
@@ -230,14 +231,9 @@ def portfolio_summary(
     holdings = {}
 
     for trade in trades:
-
-        stock = (
-            db.query(Stock)
-            .filter(
-                Stock.id == trade.stock_id
-            )
-            .first()
-        )
+        stock = trade.stock
+        if not stock:
+            continue
 
         if stock.symbol not in holdings:
             holdings[stock.symbol] = {

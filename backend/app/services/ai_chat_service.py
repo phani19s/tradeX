@@ -103,10 +103,88 @@ def _format_context(context):
     return "\n".join(lines)
 
 
-def _fallback_answer(context):
+def _fallback_answer(context, db: Session = None):
     stock = context["stock"]
     risk = context["portfolio"]["risk_metrics"]
     question = context["question"].lower()
+
+    # Handle stock recommendations / "which stock can i buy" queries
+    buy_keywords = ["buy", "recommend", "suggest", "good stock", "which stock", "opportunity", "investment"]
+    if any(keyword in question for keyword in buy_keywords):
+        if db:
+            from app.models.stock import Stock
+            from app.services.market_intelligence_service import get_prediction, get_news_sentiment
+            all_stocks = db.query(Stock).all()
+            if all_stocks:
+                recommendations = []
+                for s in all_stocks:
+                    pred = get_prediction(s)
+                    sent = get_news_sentiment(s)
+                    if pred["label"] == "Bullish":
+                        recommendations.append((s, pred, sent))
+                
+                # If no bullish stock, default to highest close relative to current price (highest value)
+                if not recommendations:
+                    for s in all_stocks:
+                        pred = get_prediction(s)
+                        sent = get_news_sentiment(s)
+                        recommendations.append((s, pred, sent))
+                    recommendations.sort(key=lambda x: x[0].current_price, reverse=True)
+                else:
+                    recommendations.sort(key=lambda x: x[1]["confidence"], reverse=True)
+                
+                if recommendations:
+                    response_lines = [
+                        "Based on the latest TradeX market analytics, here are the top stock opportunities identified:",
+                        ""
+                    ]
+                    for s, pred, sent in recommendations[:3]:
+                        response_lines.append(
+                            f"- **{s.company_name} ({s.symbol})**: Trading at Rs. {s.current_price}. "
+                            f"The algorithmic prediction is **{pred['label']}** ({pred['confidence']}% confidence) due to its recent price movement. "
+                            f"Overall news sentiment is {sent['label'].lower()}."
+                        )
+                    response_lines.extend([
+                        "",
+                        f"Your current portfolio risk profile is **{risk['risk_level']}** (score: {risk['risk_score']}). "
+                        "Please ensure any new positions align with your risk tolerance and diversification strategy before placing orders."
+                    ])
+                    return "\n".join(response_lines)
+        return (
+            "I could not retrieve active stock recommendations right now. "
+            "Please check the Market Overview page for live stock trends and details."
+        )
+
+    # Handle questions about "riskiest stock" or "high risk stock"
+    if "riskiest" in question or ("risk" in question and "stock" in question):
+        if db:
+            from app.models.stock import Stock
+            all_stocks = db.query(Stock).all()
+            if all_stocks:
+                # Determine riskiness based on absolute daily percentage change or deviation
+                riskiest_stock = None
+                max_change = -1.0
+                for s in all_stocks:
+                    current = float(s.current_price or 0)
+                    previous = float(s.previous_close or current or 1)
+                    change = abs((current - previous) / previous) * 100 if previous else 0
+                    if change > max_change:
+                        max_change = change
+                        riskiest_stock = s
+                
+                if riskiest_stock:
+                    current = float(riskiest_stock.current_price or 0)
+                    previous = float(riskiest_stock.previous_close or current or 1)
+                    change = ((current - previous) / previous) * 100 if previous else 0
+                    return (
+                        f"Based on recent market movements, the riskiest stock currently is {riskiest_stock.company_name} ({riskiest_stock.symbol}). "
+                        f"It is trading at Rs. {riskiest_stock.current_price} with a daily price change of {change:.2f}%. "
+                        "High price volatility increases investment risk, so ensure this aligns with your risk tolerance."
+                    )
+        return (
+            "Evaluating stock risk depends on individual factors. Some assets exhibit higher volatility due to recent large price swings. "
+            "Please specify a stock symbol to analyze its current volatility, prediction, and sentiment details."
+        )
 
     if "portfolio" in question or "risk" in question:
         return (
@@ -190,9 +268,9 @@ def answer_question(db: Session, user_id: int, message: str):
     prompt = f"{_format_context(context)}\n\nUser question: {message}"
 
     try:
-        answer = _call_openai(prompt) or _call_gemini(prompt) or _fallback_answer(context)
+        answer = _call_openai(prompt) or _call_gemini(prompt) or _fallback_answer(context, db)
     except Exception:
-        answer = _fallback_answer(context)
+        answer = _fallback_answer(context, db)
 
     history = ChatHistory(
         user_id=user_id,

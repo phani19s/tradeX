@@ -24,3 +24,5 @@ class Watchlist(Base):
         Integer,
         ForeignKey("stocks.id")
     )
+    from sqlalchemy.orm import relationship
+    stock = relationship("Stock")

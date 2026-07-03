@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.dependencies import get_db
 
@@ -238,6 +238,7 @@ def trade_history(
 
     trades = (
         db.query(Trade)
+        .options(joinedload(Trade.stock))
         .filter(
             Trade.user_id == user_id
         )
@@ -247,27 +248,15 @@ def trade_history(
 
     history = []
 
-    for trade in trades:
+    for idx, trade in enumerate(trades):
+        stock = trade.stock
 
-        stock = (
-            db.query(Stock)
-            .filter(
-                Stock.id == trade.stock_id
-            )
-            .first()
-        )
-
-        latest_buy = (
-            db.query(Trade)
-            .filter(
-                Trade.user_id == user_id,
-                Trade.stock_id == trade.stock_id,
-                Trade.trade_type == "BUY",
-                Trade.id <= trade.id
-            )
-            .order_by(Trade.id.desc())
-            .first()
-        )
+        # Resolve latest_buy at or before this trade in-memory
+        latest_buy = None
+        for t in trades[idx:]:
+            if t.stock_id == trade.stock_id and t.trade_type == "BUY":
+                latest_buy = t
+                break
 
         buy_price = latest_buy.price if latest_buy else trade.price
         current_price = stock.current_price if stock else trade.price
@@ -281,8 +270,8 @@ def trade_history(
             {
                 "id": trade.id,
                 "stock_id": trade.stock_id,
-                "stock_symbol": stock.symbol,
-                "company_name": stock.company_name,
+                "stock_symbol": stock.symbol if stock else "Unknown",
+                "company_name": stock.company_name if stock else "Unknown",
                 "trade_type": trade.trade_type,
                 "quantity": trade.quantity,
                 "price": trade.price,
@@ -307,6 +296,7 @@ def holdings(
 
     trades = (
         db.query(Trade)
+        .options(joinedload(Trade.stock))
         .filter(
             Trade.user_id == user_id
         )
@@ -315,16 +305,14 @@ def holdings(
 
     holdings_data = {}
     buy_prices = {}
+    stocks_dict = {}
 
     for trade in trades:
+        stock = trade.stock
+        if not stock:
+            continue
 
-        stock = (
-            db.query(Stock)
-            .filter(
-                Stock.id == trade.stock_id
-            )
-            .first()
-        )
+        stocks_dict[stock.symbol] = stock
 
         if stock.symbol not in holdings_data:
             holdings_data[stock.symbol] = 0
@@ -340,34 +328,26 @@ def holdings(
     result = []
 
     for symbol, quantity in holdings_data.items():
-
         if quantity > 0:
-
-            stock = (
-                db.query(Stock)
-                .filter(
-                    Stock.symbol == symbol
+            stock = stocks_dict.get(symbol)
+            if stock:
+                result.append(
+                    {
+                        "symbol": stock.symbol,
+                        "company_name": stock.company_name,
+                        "quantity": quantity,
+                        "buy_price": buy_prices[symbol],
+                        "current_price": stock.current_price,
+                        "market_value": (
+                            quantity * stock.current_price
+                        ),
+                        "profit_loss":
+                            (
+                                stock.current_price -
+                                buy_prices[symbol]
+                            ) * quantity
+                    }
                 )
-                .first()
-            )
-
-            result.append(
-                {
-                    "symbol": stock.symbol,
-                    "company_name": stock.company_name,
-                    "quantity": quantity,
-                    "buy_price":buy_prices[symbol],
-                    "current_price": stock.current_price,
-                    "market_value": (
-                        quantity * stock.current_price
-                    ),
-                    "profit_loss":
-                        (
-                            stock.current_price -
-                            buy_prices[symbol]
-                        ) * quantity
-                }
-            )
 
     return result
 
@@ -457,18 +437,18 @@ def get_sl_tp(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    orders = db.query(SLTPOrder).filter(
+    orders = db.query(SLTPOrder).options(joinedload(SLTPOrder.stock)).filter(
         SLTPOrder.user_id == current_user.id,
         SLTPOrder.is_active == True
     ).all()
     
     result = []
     for order in orders:
-        stock = db.query(Stock).filter(Stock.id == order.stock_id).first()
+        stock = order.stock
         result.append({
             "id": order.id,
             "stock_id": order.stock_id,
-            "symbol": stock.symbol,
+            "symbol": stock.symbol if stock else "Unknown",
             "sl_price": order.sl_price,
             "tp_price": order.tp_price,
             "buy_price": order.buy_price,

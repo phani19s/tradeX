@@ -35,6 +35,15 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 SESSION_TIMEOUT_MINUTES = 15
+import time
+
+_maintenance_cache = {
+    "last_check": None,
+    "mode": None,
+    "title": None,
+    "message": None,
+    "eta": None
+}
 
 
 def hash_password(password: str):
@@ -270,21 +279,31 @@ def get_current_user(
         request
     )
     
-    # Check if maintenance mode is active
+    # Check if maintenance mode is active (using cached values to prevent N+1 queries on every request)
     from app.models.system_setting import SystemSetting
     import json
     try:
-        maintenance_setting = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_mode").first()
-        if maintenance_setting and maintenance_setting.value == "true" and not user.is_admin:
-            title = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_title").first()
-            msg = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_message").first()
-            eta = db.query(SystemSetting).filter(SystemSetting.key == "maintenance_eta").first()
-            
+        global _maintenance_cache
+        now_time = time.time()
+        if _maintenance_cache["last_check"] is None or now_time - _maintenance_cache["last_check"] > 10:
+            settings = db.query(SystemSetting).filter(SystemSetting.key.in_([
+                "maintenance_mode", "maintenance_title", "maintenance_message", "maintenance_eta"
+            ])).all()
+            settings_dict = {s.key: s.value for s in settings}
+            _maintenance_cache.update({
+                "last_check": now_time,
+                "mode": settings_dict.get("maintenance_mode"),
+                "title": settings_dict.get("maintenance_title"),
+                "message": settings_dict.get("maintenance_message"),
+                "eta": settings_dict.get("maintenance_eta")
+            })
+
+        if _maintenance_cache["mode"] == "true" and not user.is_admin:
             detail_msg = {
                 "error": "maintenance",
-                "title": title.value if title else "System Under Maintenance",
-                "message": msg.value if msg else "We are currently performing scheduled maintenance. Please check back later.",
-                "eta": eta.value if eta else "Shortly"
+                "title": _maintenance_cache["title"] or "System Under Maintenance",
+                "message": _maintenance_cache["message"] or "We are currently performing scheduled maintenance. Please check back later.",
+                "eta": _maintenance_cache["eta"] or "Shortly"
             }
             raise HTTPException(
                 status_code=503,

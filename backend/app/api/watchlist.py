@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.dependencies import get_db
 from app.core.security import get_current_user
@@ -77,6 +77,7 @@ def get_watchlist(
 
     items = (
         db.query(Watchlist)
+        .options(joinedload(Watchlist.stock))
         .filter(
             Watchlist.user_id == current_user.id
         )
@@ -86,14 +87,9 @@ def get_watchlist(
     result = []
 
     for item in items:
-
-        stock = (
-            db.query(Stock)
-            .filter(
-                Stock.id == item.stock_id
-            )
-            .first()
-        )
+        stock = item.stock
+        if not stock:
+            continue
 
         result.append(
             {

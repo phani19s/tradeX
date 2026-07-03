@@ -3561,9 +3561,9 @@ class HolidayCreate(BaseModel):
     date: datetime
     holiday_type: str
     market_status: str
-    start_time: str = None
-    end_time: str = None
-    description: str = None
+    start_time: str | None = None
+    end_time: str | None = None
+    description: str | None = None
     is_active: bool = True
 
 
@@ -3840,17 +3840,66 @@ def toggle_holiday(
 
 @router.get("/holidays/upcoming")
 def get_upcoming_holidays(
+    search: str = None,
+    year: int = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     import datetime
     now = datetime.datetime.now()
     today_start = datetime.datetime(now.year, now.month, now.day)
-    upcoming = (
-        db.query(MarketHoliday)
-        .filter(MarketHoliday.is_active == True)
-        .filter(MarketHoliday.date >= today_start)
-        .order_by(MarketHoliday.date.asc())
-        .all()
-    )
+    
+    query = db.query(MarketHoliday).filter(MarketHoliday.is_active == True)
+    
+    # Apply search filter if present
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (MarketHoliday.name.ilike(search_filter)) |
+            (MarketHoliday.description.ilike(search_filter))
+        )
+        
+    if year:
+        start_year = datetime.datetime(year, 1, 1)
+        end_year = datetime.datetime(year, 12, 31, 23, 59, 59)
+        # Fetch this year's holidays
+        this_year_holidays = (
+            query.filter(MarketHoliday.date >= start_year)
+            .filter(MarketHoliday.date <= end_year)
+            .order_by(MarketHoliday.date.asc())
+            .all()
+        )
+        
+        # If less than 5 holidays are found, fill from subsequent years
+        if len(this_year_holidays) >= 5:
+            upcoming = this_year_holidays
+        else:
+            needed = 5 - len(this_year_holidays)
+            next_holidays = (
+                query.filter(MarketHoliday.date > end_year)
+                .order_by(MarketHoliday.date.asc())
+                .limit(needed)
+                .all()
+            )
+            upcoming = this_year_holidays + next_holidays
+    else:
+        # Default upcoming view: date >= today_start
+        upcoming = (
+            query.filter(MarketHoliday.date >= today_start)
+            .order_by(MarketHoliday.date.asc())
+            .limit(5)
+            .all()
+        )
+        
+        # If less than 5 upcoming holidays exist in total database, fill with past holidays
+        if len(upcoming) < 5:
+            needed = 5 - len(upcoming)
+            past_holidays = (
+                query.filter(MarketHoliday.date < today_start)
+                .order_by(MarketHoliday.date.desc())
+                .limit(needed)
+                .all()
+            )
+            upcoming = list(reversed(past_holidays)) + upcoming
+            
     return upcoming

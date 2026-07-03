@@ -346,7 +346,12 @@ function AdminSupportPage() {
                     ) : (
                       tickets.map(ticket => (
                         <tr key={ticket.id} className="hover:bg-surface/10 transition animate-in fade-in duration-200">
-                          <td className="px-4 py-4 text-sm font-bold">{ticket.ticket_number}</td>
+                          <td className="px-4 py-4 text-sm font-bold">
+                            <div>{ticket.ticket_number}</div>
+                            <div className="text-[10px] text-gray-400 font-normal mt-1" title={ticket.email || ticket.username}>
+                              {ticket.email || ticket.username || `User #${ticket.user_id}`}
+                            </div>
+                          </td>
                           <td className="px-4 py-4 text-sm">{ticket.issue_type}</td>
                           <td className="px-4 py-4 text-sm max-w-[300px] truncate" title={ticket.description}>
                             {ticket.description}

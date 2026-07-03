@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import api from "../api/api";
+import { useTheme } from "../context/ThemeContext";
 
-export default function ActiveBanners() {
+export default function ActiveBanners({ onBannersLoaded, isLoginPage = false }) {
   const [banners, setBanners] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const { resolvedThemeClass } = useTheme();
+  const isLightTheme = resolvedThemeClass !== "theme-dark";
 
   useEffect(() => {
     fetchActiveBanners();
@@ -21,9 +24,16 @@ export default function ActiveBanners() {
   const fetchActiveBanners = async () => {
     try {
       const res = await api.get("/admin/banners/active");
-      setBanners(res.data || []);
+      const list = res.data || [];
+      setBanners(list);
+      if (onBannersLoaded) {
+        onBannersLoaded(list.length > 0);
+      }
     } catch (error) {
       console.error("Failed to load active banners:", error);
+      if (onBannersLoaded) {
+        onBannersLoaded(false);
+      }
     }
   };
 
@@ -32,30 +42,47 @@ export default function ActiveBanners() {
   const current = banners[currentIndex];
 
   return (
-    <div className="w-full relative overflow-hidden rounded-2xl border shadow-lg transition duration-300 animate-in fade-in duration-300 mb-6" style={{ borderColor: "var(--border)" }}>
+    <div 
+      className={`w-full relative overflow-hidden rounded-3xl border transition duration-300 animate-in fade-in duration-300 flex ${
+        isLoginPage ? "mb-0 border-blue-400/20 bg-slate-900/60 backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.5)]" : "mb-6 shadow-lg"
+      }`} 
+      style={isLoginPage ? {} : { borderColor: "var(--border)" }}
+    >
       {/* Slide Content */}
-      <div className="relative h-44 sm:h-52 w-full bg-black/10">
+      <div className={`relative w-full bg-black/10 flex flex-col justify-stretch ${
+        isLoginPage ? "min-h-[250px] lg:min-h-[500px] h-full" : "h-44 sm:h-52"
+      }`}>
         <img
           src={current.image_url}
           alt={current.title}
-          className="w-full h-full object-cover select-none"
+          className="w-full h-full object-cover select-none absolute inset-0"
           onError={(e) => { e.target.style.display = 'none'; }}
         />
         
         {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent p-6 flex flex-col justify-center text-white space-y-2">
-          <span className="rounded-full bg-accent/90 backdrop-blur w-fit px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: "var(--accent)" }}>
+        <div className={`absolute inset-0 bg-gradient-to-r p-8 flex flex-col justify-center space-y-3 transition-colors duration-300 ${
+          isLoginPage 
+            ? "from-slate-950 via-slate-950/80 to-transparent text-white" 
+            : (isLightTheme 
+              ? "from-[var(--card)] via-[var(--card)]/80 to-[var(--card)]/10 text-[var(--text)]" 
+              : "from-black/85 via-black/55 to-transparent text-white")
+        }`}>
+          <span className="rounded-full bg-accent/90 backdrop-blur w-fit px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white" style={{ background: "var(--accent)" }}>
             {current.banner_type}
           </span>
-          <h3 className="text-xl sm:text-2xl font-black max-w-lg truncate">{current.title}</h3>
-          <p className="text-xs max-w-md line-clamp-2 opacity-85 leading-relaxed">{current.description}</p>
+          <h3 className={`font-black max-w-lg truncate ${
+            isLoginPage ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl"
+          }`}>{current.title}</h3>
+          <p className={`max-w-md opacity-85 leading-relaxed ${
+            isLoginPage ? "text-sm line-clamp-4" : "text-xs line-clamp-2"
+          }`}>{current.description}</p>
           
           {current.button_text && (
-            <div className="pt-1.5">
+            <div className="pt-2">
               <a
                 href={current.button_url || "#"}
-                className="inline-block rounded-xl bg-accent text-white px-4 py-2 text-xs font-bold hover:bg-accent/90 shadow transition"
-                style={{ background: "var(--accent)" }}
+                className="inline-block rounded-xl bg-accent px-5 py-2.5 text-xs font-bold hover:bg-accent/90 shadow transition"
+                style={{ background: "var(--accent)", color: "var(--accent-contrast)" }}
               >
                 {current.button_text}
               </a>
@@ -66,13 +93,13 @@ export default function ActiveBanners() {
 
       {/* Navigation Indicators */}
       {banners.length > 1 && (
-        <div className="absolute bottom-4 right-4 flex gap-1.5">
+        <div className="absolute bottom-4 right-4 flex gap-1.5 z-20">
           {banners.map((_, idx) => (
             <button
               key={idx}
               onClick={() => setCurrentIndex(idx)}
               className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                idx === currentIndex ? "bg-white scale-125" : "bg-white/40"
+                idx === currentIndex ? "bg-accent scale-125" : "bg-white/40"
               }`}
             />
           ))}

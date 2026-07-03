@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, T
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
+from app.models.user import User
 
 class SupportTicket(Base):
     __tablename__ = "support_tickets"
@@ -19,6 +20,14 @@ class SupportTicket(Base):
     resolved_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="support_tickets")
+
+    @property
+    def username(self):
+        return self.user.username if self.user else None
+
+    @property
+    def email(self):
+        return self.user.email if self.user else None
 
 class SupportMessage(Base):
     __tablename__ = "support_messages"

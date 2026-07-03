@@ -74,8 +74,15 @@ def check_price_alerts(db: Session):
         .all()
     )
 
+    if not alerts:
+        return
+
+    # Prefetch all active stocks to avoid N+1 database queries inside the loop
+    stocks = db.query(Stock).filter(Stock.is_active == True).all()
+    stocks_by_symbol = {s.symbol.upper(): s for s in stocks}
+
     for alert in alerts:
-        stock = db.query(Stock).filter(Stock.symbol == alert.symbol.upper()).first()
+        stock = stocks_by_symbol.get(alert.symbol.upper())
         if stock and alert_matches(alert, float(stock.current_price or 0)):
             trigger_alert(db, alert, stock)
 

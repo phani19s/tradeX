@@ -92,12 +92,18 @@ function Navbar() {
     const user = JSON.parse(localStorage.getItem("user") || "null");
     if (!user?.is_admin) return;
     try {
-      const res = await api.get("/support/admin/chat/users", getAuthHeaders());
-      const totalUnread = res.data.reduce((sum, item) => sum + (item.unread_count || 0), 0);
-      setUnreadChats(totalUnread);
+      const [chatsRes, ticketsRes, feedbackRes] = await Promise.all([
+        api.get("/support/admin/chat/users", getAuthHeaders()),
+        api.get("/support/admin/tickets", getAuthHeaders()),
+        api.get("/feedback/admin", getAuthHeaders())
+      ]);
+      const totalUnreadChats = chatsRes.data.reduce((sum, item) => sum + (item.unread_count || 0), 0);
+      const openTicketsCount = ticketsRes.data.filter(t => t.status === "OPEN" || t.status === "IN_PROGRESS").length;
+      const pendingFeedbackCount = feedbackRes.data.filter(f => f.status === "Pending").length;
+      setUnreadChats(totalUnreadChats + openTicketsCount + pendingFeedbackCount);
     } catch (error) {
       if (error.response?.status !== 401) {
-        console.error("Failed to fetch unread chats", error);
+        console.error("Failed to fetch unread chats, tickets, or feedback notifications", error);
       }
     }
   }

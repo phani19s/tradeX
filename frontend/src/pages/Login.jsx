@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import api from "../api/api";
@@ -8,7 +8,6 @@ import {
 } from "react-toastify";
 
 import tradingBg from "../assets/trading-bg.jpg";
-import ActiveBanners from "../components/ActiveBanners";
 
 function Login() {
 
@@ -36,6 +35,25 @@ function Login() {
 
   const navigate =
     useNavigate();
+
+  const [hasBanners, setHasBanners] = useState(false);
+  const [activeBanner, setActiveBanner] = useState(null);
+
+  useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        const res = await api.get("/admin/banners/active");
+        const list = res.data || [];
+        if (list.length > 0) {
+          setActiveBanner(list[0]);
+          setHasBanners(true);
+        }
+      } catch (error) {
+        console.error("Failed to load active banners:", error);
+      }
+    };
+    fetchBanners();
+  }, []);
 
   const getDeviceLocation = async () => {
     const cachedLocation = localStorage.getItem("tradex_device_location");
@@ -227,10 +245,22 @@ return (
 
     </svg>
 
-    <div className="flex flex-col gap-4 items-center justify-center z-10 max-w-full px-4">
-      <div className="w-[450px] max-w-full">
-        <ActiveBanners />
-      </div>
+    <div className={`flex justify-center z-10 max-w-full px-4 ${
+      hasBanners ? "flex-col lg:flex-row gap-8 xl:gap-12 items-stretch" : "flex-col items-center gap-4"
+    }`}>
+      {hasBanners && activeBanner && (
+        <div className="w-[450px] max-w-full animate-in fade-in duration-300 flex flex-col justify-center p-6 text-white">
+          <span className="inline-block text-[11px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-400 border border-blue-500/35 px-3.5 py-1 rounded-full w-fit mb-6 shadow-[0_0_15px_rgba(59,130,246,0.3)] backdrop-blur-sm">
+            ✨ {activeBanner.banner_type}
+          </span>
+          <h2 className="text-4xl font-extrabold leading-tight tracking-tight mb-4 text-white">
+            {activeBanner.title}
+          </h2>
+          <p className="text-lg text-blue-100 opacity-90 leading-relaxed font-semibold">
+            {activeBanner.description}
+          </p>
+        </div>
+      )}
 
       {/* Login Card */}
 
@@ -247,6 +277,9 @@ return (
         p-10
         w-[450px]
         max-w-full
+        flex
+        flex-col
+        justify-center
       "
       >
         {/* Glow Effects */}

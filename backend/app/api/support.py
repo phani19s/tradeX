@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Form, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_
 from typing import List, Optional
 import uuid
@@ -128,7 +128,7 @@ def admin_list_tickets(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
         
-    query = db.query(SupportTicket)
+    query = db.query(SupportTicket).options(joinedload(SupportTicket.user))
     if status:
         query = query.filter(SupportTicket.status == status)
         
@@ -145,7 +145,7 @@ def admin_update_ticket(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
         
-    ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+    ticket = db.query(SupportTicket).options(joinedload(SupportTicket.user)).filter(SupportTicket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
         
@@ -321,28 +321,35 @@ def admin_get_chat_users(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
         
-    # Get distinct users who have chat history
-    user_ids = db.query(SupportMessage.user_id).distinct().all()
-    user_ids = [uid[0] for uid in user_ids]
+    # Query all messages ordered by created_at desc to find last message and unread counts in a single query
+    all_msgs = db.query(SupportMessage).order_by(SupportMessage.created_at.desc()).all()
+    
+    last_msgs_dict = {}
+    from collections import defaultdict
+    unread_counts_dict = defaultdict(int)
+    
+    for msg in all_msgs:
+        if msg.user_id not in last_msgs_dict:
+            last_msgs_dict[msg.user_id] = msg
+        if msg.sender_type == "USER" and not msg.is_read:
+            unread_counts_dict[msg.user_id] += 1
+            
+    user_ids = list(last_msgs_dict.keys())
+    users = db.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
+    users_dict = {u.id: u for u in users}
     
     summaries = []
     for uid in user_ids:
-        user = db.query(User).filter(User.id == uid).first()
-        last_msg = db.query(SupportMessage).filter(SupportMessage.user_id == uid).order_by(SupportMessage.created_at.desc()).first()
-        unread_count = db.query(SupportMessage).filter(
-            SupportMessage.user_id == uid,
-            SupportMessage.sender_type == "USER",
-            SupportMessage.is_read == False
-        ).count()
-        
+        user = users_dict.get(uid)
         if user:
+            last_msg = last_msgs_dict.get(uid)
             summaries.append({
                 "user_id": user.id,
                 "username": user.username,
                 "email": user.email,
                 "last_message": last_msg.message if last_msg else "",
                 "last_message_at": last_msg.created_at if last_msg else datetime.utcnow(),
-                "unread_count": unread_count
+                "unread_count": unread_counts_dict[uid]
             })
         
     return sorted(summaries, key=lambda x: x["last_message_at"], reverse=True)

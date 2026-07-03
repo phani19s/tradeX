@@ -302,24 +302,24 @@ def parse_email_sender(email_str: str, default_name: str = "TradeX"):
     }
 
 
-def _send_html_email(to_email: str, subject: str, body: str, reply_to: str | None = None):
+def _send_html_email_sync(to_email: str, subject: str, body: str, reply_to: str | None = None):
     # Validate configurations
     if not BREVO_API_KEY:
-        raise HTTPException(status_code=500, detail="BREVO_API_KEY is not configured in backend/.env")
+        logger.error("BREVO_API_KEY is not configured in backend/.env")
+        return
     if not EMAIL_FROM:
-        raise HTTPException(status_code=500, detail="EMAIL_FROM is not configured in backend/.env")
+        logger.error("EMAIL_FROM is not configured in backend/.env")
+        return
 
     # Detect if user provided an SMTP key instead of a REST API key
     if BREVO_API_KEY.startswith("xsmtpsib-"):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Your BREVO_API_KEY starts with 'xsmtpsib-', which is an SMTP key. "
-                "For the Brevo REST API to work on Render, you must use a REST API key starting with 'xkeysib-'. "
-                "Please go to your Brevo account → 'SMTP & API' → 'API Keys' tab, generate a new key, "
-                "and update BREVO_API_KEY in your backend/.env file."
-            )
+        logger.error(
+            "Your BREVO_API_KEY starts with 'xsmtpsib-', which is an SMTP key. "
+            "For the Brevo REST API to work on Render, you must use a REST API key starting with 'xkeysib-'. "
+            "Please go to your Brevo account → 'SMTP & API' → 'API Keys' tab, generate a new key, "
+            "and update BREVO_API_KEY in your backend/.env file."
         )
+        return
 
     # Parse sender and replyTo
     sender_info = parse_email_sender(EMAIL_FROM, "TradeX")
@@ -367,19 +367,21 @@ def _send_html_email(to_email: str, subject: str, body: str, reply_to: str | Non
             logger.error(
                 f"Failed to send email - Recipient: {to_email}, Type: {subject}, Subject: {subject}, Status: FAILED, Timestamp: {datetime.utcnow().isoformat()}, HTTP Status: {status_code}, Error: {response_body}"
             )
-            raise HTTPException(
-                status_code=400,
-                detail=f"Email delivery failed (HTTP {status_code}): {response_body}"
-            )
             
     except requests.RequestException as e:
         logger.error(
             f"Failed to send email - Recipient: {to_email}, Type: {subject}, Subject: {subject}, Status: FAILED, Timestamp: {datetime.utcnow().isoformat()}, Error: {str(e)}"
         )
-        raise HTTPException(
-            status_code=400,
-            detail=f"Email service temporarily unavailable: {str(e)}"
-        )
+
+
+def _send_html_email(to_email: str, subject: str, body: str, reply_to: str | None = None):
+    import threading
+    thread = threading.Thread(
+        target=_send_html_email_sync,
+        args=(to_email, subject, body, reply_to),
+        daemon=True
+    )
+    thread.start()
 
 
 def send_deposit_approval_email(

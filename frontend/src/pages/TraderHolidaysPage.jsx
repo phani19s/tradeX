@@ -7,15 +7,28 @@ import Navbar from "../components/Navbar";
 export default function TraderHolidaysPage() {
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [holidaySearch, setHolidaySearch] = useState("");
+  const [selectedHolidayYear, setSelectedHolidayYear] = useState("");
+  const holidayYearOptions = [2024, 2025, 2026, 2027, 2028];
 
   useEffect(() => {
-    fetchUpcomingHolidays();
-  }, []);
+    const handler = setTimeout(() => {
+      fetchUpcomingHolidays();
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [holidaySearch, selectedHolidayYear]);
 
   const fetchUpcomingHolidays = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/admin/holidays/upcoming", getAuthHeaders());
+      const params = {};
+      if (holidaySearch) params.search = holidaySearch;
+      if (selectedHolidayYear) params.year = Number(selectedHolidayYear);
+
+      const res = await api.get("/admin/holidays/upcoming", {
+        params,
+        ...getAuthHeaders()
+      });
       setHolidays(res.data || []);
     } catch (error) {
       toast.error("Failed to load upcoming market holidays");
@@ -40,8 +53,37 @@ export default function TraderHolidaysPage() {
           </p>
         </div>
 
+        {/* Filters panel */}
+        <div className="theme-card rounded-2xl p-5 shadow border flex flex-col sm:flex-row gap-4 items-center justify-between" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }}>
+          <div className="w-full sm:max-w-md">
+            <input
+              type="text"
+              value={holidaySearch}
+              onChange={(e) => setHolidaySearch(e.target.value)}
+              placeholder="Search upcoming holidays..."
+              className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-accent"
+              style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+            />
+          </div>
+
+          <div className="w-full sm:w-auto flex items-center gap-2">
+            <label className="text-xs font-bold opacity-75 whitespace-nowrap">Filter Year</label>
+            <select
+              value={selectedHolidayYear}
+              onChange={(e) => setSelectedHolidayYear(e.target.value)}
+              className="rounded-xl border px-3 py-2 text-sm focus:outline-none"
+              style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+            >
+              <option value="">Upcoming (Next 5)</option>
+              {holidayYearOptions.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {/* Informative Banner / Alert */}
-        {holidays.some(h => h.market_status === "Muhurat Trading") && (
+        {!loading && holidays.some(h => h.market_status === "Muhurat Trading") && (
           <div className="border border-amber-500/20 bg-amber-500/10 rounded-2xl p-4 flex gap-3 text-amber-500 animate-in fade-in slide-in-from-top-2 duration-200">
             <span className="text-xl">🪔</span>
             <div>
@@ -55,6 +97,12 @@ export default function TraderHolidaysPage() {
 
         {/* Holidays List */}
         <div className="theme-card rounded-2xl p-6 shadow border space-y-4" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }}>
+          <div className="flex justify-between items-center pb-2 border-b" style={{ borderColor: "var(--border)" }}>
+            <h2 className="text-lg font-bold">
+              {holidaySearch || selectedHolidayYear ? "Filtered Results" : "Next 5 Upcoming Holidays"}
+            </h2>
+          </div>
+
           {loading ? (
             <div className="py-16 flex flex-col justify-center items-center gap-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" style={{ borderColor: "var(--accent)" }}></div>
@@ -62,7 +110,7 @@ export default function TraderHolidaysPage() {
             </div>
           ) : holidays.length === 0 ? (
             <div className="py-16 text-center opacity-65 border-2 border-dashed rounded-xl" style={{ borderColor: "var(--border)" }}>
-              No upcoming market holidays found. Trading is fully open!
+              No market holidays found matching your criteria. Trading is fully open!
             </div>
           ) : (
             <div className="grid gap-4">

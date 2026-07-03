@@ -12,6 +12,8 @@ class TicketResponse(BaseModel):
     id: int
     ticket_number: str
     user_id: int
+    username: Optional[str] = None
+    email: Optional[str] = None
     transaction_id: Optional[int]
     transaction_type: Optional[str]
     issue_type: str

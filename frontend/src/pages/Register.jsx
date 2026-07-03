@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import api from "../api/api";
@@ -26,6 +26,24 @@ function Register() {
   const [adminOtpVerified, setAdminOtpVerified] = useState(false);
 
   const navigate = useNavigate();
+  const [hasBanners, setHasBanners] = useState(false);
+  const [activeBanner, setActiveBanner] = useState(null);
+
+  useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        const res = await api.get("/admin/banners/active");
+        const list = res.data || [];
+        if (list.length > 0) {
+          setActiveBanner(list[0]);
+          setHasBanners(true);
+        }
+      } catch (error) {
+        console.error("Failed to load active banners:", error);
+      }
+    };
+    fetchBanners();
+  }, []);
 
   const sendOTP = async () => {
 
@@ -238,20 +256,42 @@ return (
 
     </svg>
 
-    <div
-  className="
-  relative
-  z-10
-  overflow-hidden
-  bg-slate-900/60
-  backdrop-blur-md
-  border
-  border-blue-400/20
-  shadow-[0_20px_60px_rgba(0,0,0,0.5)]
-  rounded-3xl
-  p-10
-  w-[450px]
-"
+    <div className={`flex justify-center z-10 max-w-full px-4 ${
+      hasBanners ? "flex-col lg:flex-row gap-8 xl:gap-12 items-stretch" : "flex-col items-center gap-4"
+    }`}>
+      {hasBanners && activeBanner && (
+        <div className="w-[450px] max-w-full animate-in fade-in duration-300 flex flex-col justify-center p-6 text-white">
+          <span className="inline-block text-[11px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-400 border border-blue-500/35 px-3.5 py-1 rounded-full w-fit mb-6 shadow-[0_0_15px_rgba(59,130,246,0.3)] backdrop-blur-sm">
+            ✨ {activeBanner.banner_type}
+          </span>
+          <h2 className="text-4xl font-extrabold leading-tight tracking-tight mb-4 text-white">
+            {activeBanner.title}
+          </h2>
+          <p className="text-lg text-blue-100 opacity-90 leading-relaxed font-semibold">
+            {activeBanner.description}
+          </p>
+        </div>
+      )}
+
+      {/* Register Card */}
+
+      <div
+        className="
+        relative
+        overflow-hidden
+        bg-slate-900/60
+        backdrop-blur-md
+        border
+        border-blue-400/20
+        shadow-[0_20px_60px_rgba(0,0,0,0.5)]
+        rounded-3xl
+        p-10
+        w-[450px]
+        max-w-full
+        flex
+        flex-col
+        justify-center
+      "
 >
 
       {/* Glow Effects */}
@@ -679,6 +719,8 @@ return (
     </div>
 
   </div>
+
+</div>
 
 );
 }

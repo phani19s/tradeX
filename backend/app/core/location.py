@@ -24,7 +24,7 @@ def get_location(ip):
     try:
         response = requests.get(
             f"http://ip-api.com/json/{ip}",
-            timeout=2
+            timeout=0.5
         )
 
         data = response.json()
@@ -43,6 +43,7 @@ def get_location(ip):
         _location_cache[ip] = result
         return result
 
-    except:
+    except Exception:
+        _location_cache[ip] = "Unknown Location"
         return "Unknown Location"
 

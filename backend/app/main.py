@@ -267,6 +267,14 @@ def update_stock_prices_forever():
 
         try:
             stocks = db.query(Stock).all()
+            all_active_orders = db.query(SLTPOrder).filter(
+                SLTPOrder.is_active == True
+            ).all()
+
+            from collections import defaultdict
+            orders_by_stock = defaultdict(list)
+            for order in all_active_orders:
+                orders_by_stock[order.stock_id].append(order)
 
             for stock in stocks:
                 base_price = float(stock.previous_close or stock.current_price or 1)
@@ -279,10 +287,7 @@ def update_stock_prices_forever():
                     stock.previous_close = base_price
                 
                 # Check SL/TP/Limit orders for this stock
-                active_orders = db.query(SLTPOrder).filter(
-                    SLTPOrder.stock_id == stock.id,
-                    SLTPOrder.is_active == True
-                ).all()
+                active_orders = orders_by_stock.get(stock.id, [])
 
                 for order in active_orders:
                     should_trade = False

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 
 from app.core.dependencies import get_db
@@ -40,7 +40,7 @@ def get_all_feedbacks(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not authorized. Administrator access required.")
     
-    query = db.query(Feedback).join(User, Feedback.user_id == User.id)
+    query = db.query(Feedback).options(joinedload(Feedback.user)).join(User, Feedback.user_id == User.id)
     
     if status:
         query = query.filter(Feedback.status == status)
