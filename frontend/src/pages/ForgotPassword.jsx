@@ -211,10 +211,8 @@ function ForgotPassword() {
         />
       </svg>
 
-      <div className={`flex justify-center z-10 max-w-full px-4 ${
-        hasBanners ? "flex-col lg:flex-row gap-8 xl:gap-12 items-stretch" : "flex-col items-center gap-4"
-      }`}>
-        {hasBanners && banners[currentIndex] && (
+      <div className="flex justify-center z-10 max-w-full px-4 flex-col lg:flex-row gap-8 xl:gap-12 items-stretch">
+        {hasBanners && banners[currentIndex] ? (
           <div 
             key={currentIndex}
             className="w-[450px] max-w-full shrink-0 animate-in fade-in slide-in-from-bottom-3 duration-500 flex flex-col justify-center p-6 text-white"
@@ -248,6 +246,8 @@ function ForgotPassword() {
               </div>
             )}
           </div>
+        ) : (
+          <div className="w-[450px] max-w-full shrink-0 hidden lg:block" />
         )}
 
         <div className="relative z-10 w-full max-w-md shrink-0 rounded-3xl border border-blue-400/20 bg-slate-900/70 p-8 text-white shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-md">
