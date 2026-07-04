@@ -33,7 +33,7 @@ def dashboard(
     )
 
     trades = (
-        db.query(Trade)
+        db.query(Trade.stock_id, Trade.trade_type, Trade.quantity, Trade.price)
         .filter(
             Trade.user_id == user_id
         )

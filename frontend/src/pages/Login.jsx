@@ -36,24 +36,59 @@ function Login() {
   const navigate =
     useNavigate();
 
-  const [hasBanners, setHasBanners] = useState(false);
-  const [activeBanner, setActiveBanner] = useState(null);
+  // Load cached banners immediately on mount to prevent layout shift and reload flicker
+  const getCachedBanners = () => {
+    try {
+      const cached = localStorage.getItem("tradex_active_banners");
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const getSavedIndex = (listLen) => {
+    try {
+      const idx = sessionStorage.getItem("tradex_active_banner_index");
+      const parsed = idx ? parseInt(idx, 10) : 0;
+      return parsed >= 0 && parsed < listLen ? parsed : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const initialBanners = getCachedBanners();
+  const [banners, setBanners] = useState(initialBanners);
+  const [currentIndex, setCurrentIndex] = useState(getSavedIndex(initialBanners.length));
+  const [hasBanners, setHasBanners] = useState(initialBanners.length > 0);
 
   useEffect(() => {
     const fetchBanners = async () => {
       try {
         const res = await api.get("/admin/banners/active");
         const list = res.data || [];
-        if (list.length > 0) {
-          setActiveBanner(list[0]);
-          setHasBanners(true);
-        }
+        localStorage.setItem("tradex_active_banners", JSON.stringify(list));
+        setBanners(list);
+        setHasBanners(list.length > 0);
       } catch (error) {
         console.error("Failed to load active banners:", error);
       }
     };
     fetchBanners();
   }, []);
+
+  // Sync index to sessionStorage when it changes
+  useEffect(() => {
+    sessionStorage.setItem("tradex_active_banner_index", currentIndex);
+  }, [currentIndex]);
+
+  // Auto-play slideshow
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % banners.length);
+    }, 3000); // Change slide every 3 seconds
+    return () => clearInterval(interval);
+  }, [banners]);
 
   const getDeviceLocation = async () => {
     const cachedLocation = localStorage.getItem("tradex_device_location");
@@ -248,17 +283,39 @@ return (
     <div className={`flex justify-center z-10 max-w-full px-4 ${
       hasBanners ? "flex-col lg:flex-row gap-8 xl:gap-12 items-stretch" : "flex-col items-center gap-4"
     }`}>
-      {hasBanners && activeBanner && (
-        <div className="w-[450px] max-w-full animate-in fade-in duration-300 flex flex-col justify-center p-6 text-white">
-          <span className="inline-block text-[11px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-400 border border-blue-500/35 px-3.5 py-1 rounded-full w-fit mb-6 shadow-[0_0_15px_rgba(59,130,246,0.3)] backdrop-blur-sm">
-            ✨ {activeBanner.banner_type}
+      {hasBanners && banners[currentIndex] && (
+        <div 
+          key={currentIndex}
+          className="w-[450px] max-w-full animate-in fade-in slide-in-from-bottom-3 duration-500 flex flex-col justify-center p-6 text-white"
+        >
+          <span className={`inline-block text-[11px] font-black uppercase tracking-widest px-3.5 py-1 rounded-full w-fit mb-6 backdrop-blur-sm border ${
+            banners[currentIndex].banner_type === "Holiday"
+              ? "bg-rose-500/20 text-rose-400 border-rose-500/35 shadow-[0_0_15px_rgba(244,63,94,0.3)]"
+              : "bg-blue-500/20 text-blue-400 border-blue-500/35 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+          }`}>
+            ✨ {banners[currentIndex].banner_type}
           </span>
           <h2 className="text-4xl font-extrabold leading-tight tracking-tight mb-4 text-white">
-            {activeBanner.title}
+            {banners[currentIndex].title}
           </h2>
           <p className="text-lg text-blue-100 opacity-90 leading-relaxed font-semibold">
-            {activeBanner.description}
+            {banners[currentIndex].description}
           </p>
+
+          {/* Dots Indicator */}
+          {banners.length > 1 && (
+            <div className="flex gap-1.5 mt-6 z-20">
+              {banners.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
+                    idx === currentIndex ? "bg-white scale-125" : "bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

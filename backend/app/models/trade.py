@@ -21,12 +21,14 @@ class Trade(Base):
 
     user_id = Column(
         Integer,
-        ForeignKey("users.id")
+        ForeignKey("users.id"),
+        index=True
     )
 
     stock_id = Column(
         Integer,
-        ForeignKey("stocks.id")
+        ForeignKey("stocks.id"),
+        index=True
     )
 
     trade_type = Column(

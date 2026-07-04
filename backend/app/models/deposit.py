@@ -14,7 +14,7 @@ class Deposit(Base):
     __tablename__ = "deposits"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     amount = Column(Float, nullable=False)
     payment_type = Column(String, nullable=False, default="UPI")

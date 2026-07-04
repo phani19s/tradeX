@@ -261,9 +261,15 @@ def _get_authenticated_entities(
         db.commit()
         raise credentials_exception
 
-    session.last_activity = now
-    db.commit()
-    db.refresh(session)
+    # Only update last_activity and commit if the last activity was more than 30 seconds ago
+    last_activity_dt = session.last_activity or session.created_at or now
+    if getattr(last_activity_dt, "tzinfo", None) is not None:
+        last_activity_dt = last_activity_dt.replace(tzinfo=None)
+
+    if session.last_activity is None or (now - last_activity_dt).total_seconds() > 30:
+        session.last_activity = now
+        db.commit()
+        db.refresh(session)
 
     return user, session
 

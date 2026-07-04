@@ -888,6 +888,7 @@ export default function AdminContentMarketPage() {
                     <option value="National Holiday">National Holiday</option>
                     <option value="Festival">Festival</option>
                     <option value="Special Trading Day">Special Trading Day</option>
+                    <option value="Special Day">Special Day</option>
                   </select>
                 </div>
               </div>

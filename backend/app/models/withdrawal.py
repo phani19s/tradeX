@@ -7,7 +7,7 @@ class Withdrawal(Base):
     __tablename__ = "withdrawals"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
     amount = Column(Float, nullable=False)
     
     # Bank details at the time of withdrawal (snapshot)

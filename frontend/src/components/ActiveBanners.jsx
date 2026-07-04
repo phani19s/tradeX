@@ -17,7 +17,7 @@ export default function ActiveBanners({ onBannersLoaded, isLoginPage = false }) 
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
-    }, 6000); // Change slide every 6 seconds
+    }, 3000); // Change slide every 3 seconds
     return () => clearInterval(interval);
   }, [banners]);
 
@@ -40,22 +40,54 @@ export default function ActiveBanners({ onBannersLoaded, isLoginPage = false }) 
   if (banners.length === 0) return null;
 
   const current = banners[currentIndex];
+  
+  // Fallback image selection based on holiday name to suit the holiday
+  const getFallbackImage = () => {
+    if (current.banner_type === "Holiday") {
+      const name = (current.title || "").toLowerCase();
+      if (name.includes("diwali") || name.includes("muhurat")) {
+        return "https://images.unsplash.com/photo-1605847444195-22321e8d1880?w=800&auto=format&fit=crop&q=60"; // Diwali lights
+      } else if (name.includes("christmas")) {
+        return "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=60"; // Christmas tree
+      } else if (name.includes("new year")) {
+        return "https://images.unsplash.com/photo-1510076857177-7470066a4b08?w=800&auto=format&fit=crop&q=60"; // Sparklers
+      } else if (name.includes("independence") || name.includes("republic")) {
+        return "https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=800&auto=format&fit=crop&q=60"; // Indian Flag
+      } else if (name.includes("gandhi")) {
+        return "https://images.unsplash.com/photo-1561489422-45de3d015e3e?w=800&auto=format&fit=crop&q=60"; // Abstract peaceful lights
+      } else if (name.includes("eid") || name.includes("ramadan")) {
+        return "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800&auto=format&fit=crop&q=60"; // Mosque/light theme
+      } else if (name.includes("holi")) {
+        return "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=60"; // Holi colours
+      }
+      // Generic beautiful planning/calm workspace calendar image
+      return "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=60";
+    }
+    return "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=60"; // Generic trading
+  };
+
+  const imageUrl = current.image_url || getFallbackImage();
 
   return (
     <div 
-      className={`w-full relative overflow-hidden rounded-3xl border transition duration-300 animate-in fade-in duration-300 flex ${
+      className={`w-full relative overflow-hidden rounded-3xl border transition duration-300 animate-in fade-in duration-300 flex group ${
         isLoginPage ? "mb-0 border-blue-400/20 bg-slate-900/60 backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.5)]" : "mb-6 shadow-lg"
       }`} 
       style={isLoginPage ? {} : { borderColor: "var(--border)" }}
     >
       {/* Slide Content */}
-      <div className={`relative w-full bg-black/10 flex flex-col justify-stretch ${
-        isLoginPage ? "min-h-[250px] lg:min-h-[500px] h-full" : "h-44 sm:h-52"
-      }`}>
+      <div 
+        key={currentIndex}
+        className={`relative w-full bg-black/10 flex flex-col justify-stretch animate-in fade-in slide-in-from-right-3 duration-500 ${
+          isLoginPage ? "min-h-[250px] lg:min-h-[500px] h-full" : "h-44 sm:h-52"
+        }`}
+      >
         <img
-          src={current.image_url}
+          src={imageUrl}
           alt={current.title}
-          className="w-full h-full object-cover select-none absolute inset-0"
+          className={`w-full h-full object-cover select-none absolute inset-0 transition-all duration-300 ${
+            isLightTheme ? "opacity-90 contrast-[0.95] brightness-[1.02]" : "opacity-50 brightness-[0.75] contrast-[1.05]"
+          }`}
           onError={(e) => { e.target.style.display = 'none'; }}
         />
         
@@ -93,17 +125,41 @@ export default function ActiveBanners({ onBannersLoaded, isLoginPage = false }) 
 
       {/* Navigation Indicators */}
       {banners.length > 1 && (
-        <div className="absolute bottom-4 right-4 flex gap-1.5 z-20">
-          {banners.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentIndex(idx)}
-              className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                idx === currentIndex ? "bg-accent scale-125" : "bg-white/40"
-              }`}
-            />
-          ))}
-        </div>
+        <>
+          {/* Navigation Arrows */}
+          <button
+            onClick={() => setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length)}
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/35 hover:bg-black/60 backdrop-blur text-white flex items-center justify-center transition cursor-pointer md:opacity-0 group-hover:opacity-100"
+            title="Previous Banner"
+          >
+            ‹
+          </button>
+          <button
+            onClick={() => setCurrentIndex((prev) => (prev + 1) % banners.length)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/35 hover:bg-black/60 backdrop-blur text-white flex items-center justify-center transition cursor-pointer md:opacity-0 group-hover:opacity-100"
+            title="Next Banner"
+          >
+            ›
+          </button>
+
+          {/* Banner Counter */}
+          <div className="absolute top-4 right-4 z-20 bg-black/30 backdrop-blur-md text-white/90 text-[10px] font-extrabold px-2 py-0.5 rounded-full select-none">
+            {currentIndex + 1} / {banners.length}
+          </div>
+
+          {/* Dots */}
+          <div className="absolute bottom-4 right-4 flex gap-1.5 z-20">
+            {banners.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentIndex(idx)}
+                className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
+                  idx === currentIndex ? "bg-accent scale-125" : "bg-white/40"
+                }`}
+              />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

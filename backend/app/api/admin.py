@@ -3687,7 +3687,12 @@ def toggle_banner(
 @router.get("/banners/active")
 def get_active_banners(db: Session = Depends(get_db)):
     import datetime
+    from app.models.holiday import MarketHoliday
+    
     now = datetime.datetime.now()
+    today_start = datetime.datetime(now.year, now.month, now.day)
+    today_end = today_start + datetime.timedelta(days=1)
+    
     active_banners = (
         db.query(Banner)
         .filter(Banner.is_active == True)
@@ -3696,7 +3701,96 @@ def get_active_banners(db: Session = Depends(get_db)):
         .order_by(Banner.priority.desc())
         .all()
     )
-    return active_banners
+    
+    # Check if there is an active holiday today
+    holiday = (
+        db.query(MarketHoliday)
+        .filter(MarketHoliday.is_active == True)
+        .filter(MarketHoliday.date >= today_start)
+        .filter(MarketHoliday.date < today_end)
+        .first()
+    )
+    
+    holiday_banner = None
+    if holiday:
+        name_lower = (holiday.name or "").lower()
+        if "diwali" in name_lower or "muhurat" in name_lower:
+            holiday_img = "https://images.unsplash.com/photo-1605847444195-22321e8d1880?w=800&auto=format&fit=crop&q=60"
+        elif "christmas" in name_lower:
+            holiday_img = "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=60"
+        elif "new year" in name_lower:
+            holiday_img = "https://images.unsplash.com/photo-1510076857177-7470066a4b08?w=800&auto=format&fit=crop&q=60"
+        elif "independence" in name_lower or "republic" in name_lower:
+            holiday_img = "https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=800&auto=format&fit=crop&q=60"
+        elif "gandhi" in name_lower:
+            holiday_img = "https://images.unsplash.com/photo-1561489422-45de3d015e3e?w=800&auto=format&fit=crop&q=60"
+        elif "eid" in name_lower or "ramadan" in name_lower:
+            holiday_img = "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800&auto=format&fit=crop&q=60"
+        elif "holi" in name_lower:
+            holiday_img = "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=60"
+        else:
+            holiday_img = "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=60"
+        
+        if holiday.market_status == "Closed":
+            holiday_banner = {
+                "id": -holiday.id,
+                "title": f"Market Closed: {holiday.name}",
+                "description": f"Trading is disabled today due to the {holiday.name} market holiday. {holiday.description or ''}",
+                "image_url": holiday_img,
+                "banner_type": "Holiday",
+                "button_text": None,
+                "button_url": None,
+                "priority": 9999,
+                "is_active": True
+            }
+        elif holiday.market_status == "Muhurat Trading":
+            current_time_str = now.strftime("%H:%M")
+            start = holiday.start_time or "00:00"
+            end = holiday.end_time or "00:00"
+            if not (start <= current_time_str <= end):
+                holiday_banner = {
+                    "id": -holiday.id,
+                    "title": f"Market Closed: {holiday.name}",
+                    "description": f"Trading is disabled today. Muhurat Trading is only available from {start} to {end} today.",
+                    "image_url": holiday_img,
+                    "banner_type": "Holiday",
+                    "button_text": None,
+                    "button_url": None,
+                    "priority": 9999,
+                    "is_active": True
+                }
+            else:
+                holiday_banner = {
+                    "id": -holiday.id,
+                    "title": f"Muhurat Trading Active: {holiday.name}",
+                    "description": f"Special Muhurat Trading session is open today from {start} to {end}. {holiday.description or ''}",
+                    "image_url": holiday_img,
+                    "banner_type": "Holiday",
+                    "button_text": None,
+                    "button_url": None,
+                    "priority": 9999,
+                    "is_active": True
+                }
+                
+    # Convert SQLAlchemy objects to dicts so they can be mixed with the holiday banner dict
+    banners_list = []
+    if holiday_banner:
+        banners_list.append(holiday_banner)
+        
+    for b in active_banners:
+        banners_list.append({
+            "id": b.id,
+            "title": b.title,
+            "description": b.description,
+            "image_url": b.image_url,
+            "banner_type": b.banner_type,
+            "button_text": b.button_text,
+            "button_url": b.button_url,
+            "priority": b.priority,
+            "is_active": b.is_active
+        })
+        
+    return banners_list
 
 
 # --- Market Holidays Management ---
