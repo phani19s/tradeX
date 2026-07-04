@@ -27,7 +27,7 @@ def get_owned_quantity(
     stock_id
 ):
     trades = (
-        db.query(Trade)
+        db.query(Trade.trade_type, Trade.quantity)
         .filter(
             Trade.user_id == user_id,
             Trade.stock_id == stock_id

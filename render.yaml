@@ -1,0 +1,16 @@
+# Configuration for deploying TradeX Frontend as a Static Site on Render
+services:
+  - type: web
+    name: tradex-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    publishPath: frontend/dist
+    # NOTE: If you set the "Root Directory" option in the Render Dashboard to "frontend",
+    # you should change:
+    #   buildCommand: npm install && npm run build -> npm run build
+    #   publishPath: frontend/dist -> dist
+    routes:
+      # Rewrite all requests for assets or pages that aren't found directly to index.html
+      # This allows React Router to handle dynamic client-side routes.
+      - src: /*
+        dest: /index.html
