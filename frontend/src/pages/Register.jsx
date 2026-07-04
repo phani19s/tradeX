@@ -76,7 +76,7 @@ function Register() {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
-    }, 3000); // Change slide every 3 seconds
+    }, 5000); // Change slide every 5 seconds
     return () => clearInterval(interval);
   }, [banners]);
 
@@ -246,7 +246,9 @@ return (
   items-center
   justify-center
   relative
-  overflow-hidden
+  overflow-y-auto
+  py-10
+  lg:py-0
   "
   style={{
     backgroundImage: `url(${tradingBg})`,
@@ -297,7 +299,7 @@ return (
       {hasBanners && banners[currentIndex] && (
         <div 
           key={currentIndex}
-          className="w-[450px] max-w-full animate-in fade-in slide-in-from-bottom-3 duration-500 flex flex-col justify-center p-6 text-white"
+          className="w-[450px] max-w-full shrink-0 animate-in fade-in slide-in-from-bottom-3 duration-500 flex flex-col justify-center p-6 text-white"
         >
           <span className={`inline-block text-[11px] font-black uppercase tracking-widest px-3.5 py-1 rounded-full w-fit mb-6 backdrop-blur-sm border ${
             banners[currentIndex].banner_type === "Holiday"
@@ -336,6 +338,7 @@ return (
         className="
         relative
         overflow-hidden
+        shrink-0
         bg-slate-900/60
         backdrop-blur-md
         border

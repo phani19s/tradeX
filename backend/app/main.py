@@ -504,9 +504,36 @@ def ensure_audit_log_columns():
 
 
 
+def ensure_holiday_columns():
+    inspector = inspect(engine)
+    if "market_holidays" in inspector.get_table_names():
+        holiday_columns = [column["name"] for column in inspector.get_columns("market_holidays")]
+        if "image_url" not in holiday_columns:
+            with engine.begin() as connection:
+                connection.exec_driver_sql("ALTER TABLE market_holidays ADD COLUMN image_url VARCHAR")
+
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from sqlalchemy.exc import DBAPIError, OperationalError
+import logging
+
+class DatabaseRetryMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        try:
+            return await call_next(request)
+        except (OperationalError, DBAPIError) as e:
+            logging.warning(f"Database connection error encountered: {str(e)}. Retrying request...")
+            try:
+                return await call_next(request)
+            except Exception as retry_exc:
+                logging.error(f"Database retry failed: {str(retry_exc)}")
+                raise retry_exc
+
+
 app = FastAPI(
     title="TradeX API"
 )
+app.add_middleware(DatabaseRetryMiddleware)
 
 ensure_user_profile_columns()
 ensure_admin_column()
@@ -519,6 +546,7 @@ ensure_withdrawal_columns()
 ensure_trade_columns()
 ensure_security_tracking_columns()
 ensure_audit_log_columns()
+ensure_holiday_columns()
 seed_admin_user()
 seed_stocks()
 

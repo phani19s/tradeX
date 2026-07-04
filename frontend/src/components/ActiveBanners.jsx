@@ -17,7 +17,7 @@ export default function ActiveBanners({ onBannersLoaded, isLoginPage = false }) 
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
-    }, 3000); // Change slide every 3 seconds
+    }, 5000); // Change slide every 5 seconds
     return () => clearInterval(interval);
   }, [banners]);
 
@@ -41,27 +41,10 @@ export default function ActiveBanners({ onBannersLoaded, isLoginPage = false }) 
 
   const current = banners[currentIndex];
   
-  // Fallback image selection based on holiday name to suit the holiday
+  // Fallback image selection for all holidays
   const getFallbackImage = () => {
     if (current.banner_type === "Holiday") {
-      const name = (current.title || "").toLowerCase();
-      if (name.includes("diwali") || name.includes("muhurat")) {
-        return "https://images.unsplash.com/photo-1605847444195-22321e8d1880?w=800&auto=format&fit=crop&q=60"; // Diwali lights
-      } else if (name.includes("christmas")) {
-        return "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=60"; // Christmas tree
-      } else if (name.includes("new year")) {
-        return "https://images.unsplash.com/photo-1510076857177-7470066a4b08?w=800&auto=format&fit=crop&q=60"; // Sparklers
-      } else if (name.includes("independence") || name.includes("republic")) {
-        return "https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=800&auto=format&fit=crop&q=60"; // Indian Flag
-      } else if (name.includes("gandhi")) {
-        return "https://images.unsplash.com/photo-1561489422-45de3d015e3e?w=800&auto=format&fit=crop&q=60"; // Abstract peaceful lights
-      } else if (name.includes("eid") || name.includes("ramadan")) {
-        return "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800&auto=format&fit=crop&q=60"; // Mosque/light theme
-      } else if (name.includes("holi")) {
-        return "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=60"; // Holi colours
-      }
-      // Generic beautiful planning/calm workspace calendar image
-      return "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=60";
+      return "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=60";
     }
     return "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=60"; // Generic trading
   };

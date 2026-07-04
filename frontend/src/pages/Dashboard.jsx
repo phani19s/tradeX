@@ -56,16 +56,22 @@ function Dashboard() {
   }, [isAdmin, navigate]);
 
   async function loadDashboard() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     const response = await api.get("/dashboard/", getAuthHeaders());
     setData(response.data);
   }
 
   async function loadDeposits() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     const response = await api.get("/portfolio/deposits", getAuthHeaders());
     setDeposits(response.data);
   }
 
   async function loadWithdrawals() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     try {
       const response = await getWithdrawalHistory();
       setWithdrawals(response.data);
@@ -75,6 +81,8 @@ function Dashboard() {
   }
 
   async function loadTickets() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     try {
       const response = await api.get("/support/tickets", getAuthHeaders());
       setTickets(response.data);
@@ -84,6 +92,8 @@ function Dashboard() {
   }
 
   async function refreshData() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     try {
       await Promise.all([loadDashboard(), loadDeposits(), loadWithdrawals(), loadTickets()]);
     } catch (error) {

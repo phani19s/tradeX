@@ -3564,6 +3564,7 @@ class HolidayCreate(BaseModel):
     start_time: str | None = None
     end_time: str | None = None
     description: str | None = None
+    image_url: str | None = None
     is_active: bool = True
 
 
@@ -3713,23 +3714,7 @@ def get_active_banners(db: Session = Depends(get_db)):
     
     holiday_banner = None
     if holiday:
-        name_lower = (holiday.name or "").lower()
-        if "diwali" in name_lower or "muhurat" in name_lower:
-            holiday_img = "https://images.unsplash.com/photo-1605847444195-22321e8d1880?w=800&auto=format&fit=crop&q=60"
-        elif "christmas" in name_lower:
-            holiday_img = "https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=60"
-        elif "new year" in name_lower:
-            holiday_img = "https://images.unsplash.com/photo-1510076857177-7470066a4b08?w=800&auto=format&fit=crop&q=60"
-        elif "independence" in name_lower or "republic" in name_lower:
-            holiday_img = "https://images.unsplash.com/photo-1532375810709-75b1da00537c?w=800&auto=format&fit=crop&q=60"
-        elif "gandhi" in name_lower:
-            holiday_img = "https://images.unsplash.com/photo-1561489422-45de3d015e3e?w=800&auto=format&fit=crop&q=60"
-        elif "eid" in name_lower or "ramadan" in name_lower:
-            holiday_img = "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800&auto=format&fit=crop&q=60"
-        elif "holi" in name_lower:
-            holiday_img = "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=60"
-        else:
-            holiday_img = "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=60"
+        holiday_img = holiday.image_url or "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=60"
         
         if holiday.market_status == "Closed":
             holiday_banner = {
@@ -3845,6 +3830,7 @@ def create_holiday(
         start_time=payload.start_time,
         end_time=payload.end_time,
         description=payload.description,
+        image_url=payload.image_url,
         is_active=payload.is_active
     )
     db.add(holiday)
@@ -3880,6 +3866,7 @@ def update_holiday(
     holiday.start_time = payload.start_time
     holiday.end_time = payload.end_time
     holiday.description = payload.description
+    holiday.image_url = payload.image_url
     holiday.is_active = payload.is_active
     
     db.commit()

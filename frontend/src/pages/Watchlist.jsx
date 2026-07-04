@@ -21,9 +21,10 @@ function Watchlist() {
   const [stockToRemove, setStockToRemove] = useState(null);
 
   async function fetchWatchlist() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
     try {
-  
       const response =
         await api.get(
           "/watchlist/",
@@ -35,11 +36,8 @@ function Watchlist() {
       );
   
     } catch (error) {
-  
       console.log(error);
-  
     }
-  
   }
 
   useEffect(() => {

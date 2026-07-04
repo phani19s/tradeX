@@ -71,13 +71,17 @@ function Navbar() {
     return () => {
       clearInterval(interval);
       window.removeEventListener("tradex_chats_updated", handleChatUpdate);
-      if (socket?.readyState === WebSocket.OPEN) {
-        socket.close();
+      if (socket) {
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+          socket.close();
+        }
       }
     };
   }, []);
 
   async function fetchUnreadCount() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     try {
       const res = await api.get("/notifications/unread-count", getAuthHeaders());
       setUnreadCount(res.data.count);
@@ -89,6 +93,8 @@ function Navbar() {
   }
 
   async function fetchUnreadChats() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     const user = JSON.parse(localStorage.getItem("user") || "null");
     if (!user?.is_admin) return;
     try {

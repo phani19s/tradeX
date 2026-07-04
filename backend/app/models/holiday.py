@@ -13,5 +13,6 @@ class MarketHoliday(Base):
     start_time = Column(String, nullable=True)  # e.g., "17:30"
     end_time = Column(String, nullable=True)    # e.g., "18:30"
     description = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())

@@ -71,7 +71,7 @@ function ForgotPassword() {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % banners.length);
-    }, 3000); // Change slide every 3 seconds
+    }, 5000); // Change slide every 5 seconds
     return () => clearInterval(interval);
   }, [banners]);
 
@@ -170,7 +170,7 @@ function ForgotPassword() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center relative overflow-hidden px-4"
+      className="min-h-screen flex items-center justify-center relative overflow-y-auto py-10 lg:py-0 px-4"
       style={{
         backgroundImage: `url(${tradingBg})`,
         backgroundSize: "cover",
@@ -217,7 +217,7 @@ function ForgotPassword() {
         {hasBanners && banners[currentIndex] && (
           <div 
             key={currentIndex}
-            className="w-[450px] max-w-full animate-in fade-in slide-in-from-bottom-3 duration-500 flex flex-col justify-center p-6 text-white"
+            className="w-[450px] max-w-full shrink-0 animate-in fade-in slide-in-from-bottom-3 duration-500 flex flex-col justify-center p-6 text-white"
           >
             <span className={`inline-block text-[11px] font-black uppercase tracking-widest px-3.5 py-1 rounded-full w-fit mb-6 backdrop-blur-sm border ${
               banners[currentIndex].banner_type === "Holiday"
@@ -250,7 +250,7 @@ function ForgotPassword() {
           </div>
         )}
 
-        <div className="relative z-10 w-full max-w-md rounded-3xl border border-blue-400/20 bg-slate-900/70 p-8 text-white shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-md">
+        <div className="relative z-10 w-full max-w-md shrink-0 rounded-3xl border border-blue-400/20 bg-slate-900/70 p-8 text-white shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-md">
           <h1 className="text-center text-4xl font-extrabold">TradeX</h1>
           <p className="mt-2 text-center text-sm text-blue-200">Reset account password</p>
 

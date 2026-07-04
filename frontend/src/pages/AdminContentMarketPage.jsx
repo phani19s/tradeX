@@ -60,6 +60,7 @@ export default function AdminContentMarketPage() {
     start_time: "17:30",
     end_time: "18:30",
     description: "",
+    image_url: "",
     is_active: true
   });
   
@@ -92,18 +93,28 @@ export default function AdminContentMarketPage() {
   }, [holidaySearch]);
 
   const fetchBanners = async () => {
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (!token || !user?.is_admin) return;
+
     try {
       setLoadingBanners(true);
       const res = await api.get("/admin/banners", getAuthHeaders());
       setBanners(res.data || []);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to load banners");
+      if (error.response?.status !== 401) {
+        toast.error(error.response?.data?.detail || "Failed to load banners");
+      }
     } finally {
       setLoadingBanners(false);
     }
   };
 
   const fetchHolidays = async () => {
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (!token || !user?.is_admin) return;
+
     try {
       setLoadingHolidays(true);
       const params = {};
@@ -116,7 +127,9 @@ export default function AdminContentMarketPage() {
       });
       setHolidays(res.data || []);
     } catch (error) {
-      toast.error("Failed to load market holidays");
+      if (error.response?.status !== 401) {
+        toast.error("Failed to load market holidays");
+      }
     } finally {
       setLoadingHolidays(false);
     }
@@ -223,6 +236,7 @@ export default function AdminContentMarketPage() {
       start_time: "17:30",
       end_time: "18:30",
       description: "",
+      image_url: "",
       is_active: true
     });
     setShowHolidayModal(true);
@@ -238,6 +252,7 @@ export default function AdminContentMarketPage() {
       start_time: h.start_time || "17:30",
       end_time: h.end_time || "18:30",
       description: h.description || "",
+      image_url: h.image_url || "",
       is_active: h.is_active
     });
     setShowHolidayModal(true);
@@ -957,6 +972,18 @@ export default function AdminContentMarketPage() {
                   className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none"
                   style={{ borderColor: "var(--border)", background: "var(--surface)" }}
                   placeholder="e.g., Laxmi Puja trading session schedule details."
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold opacity-75 mb-1 block">Banner Background Image URL (Optional)</label>
+                <input
+                  type="text"
+                  value={holidayFormData.image_url}
+                  onChange={(e) => setHolidayFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                  className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none"
+                  style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                  placeholder="e.g. https://images.unsplash.com/... (leave empty for automatic themed image)"
                 />
               </div>
 

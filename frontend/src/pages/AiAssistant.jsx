@@ -34,7 +34,8 @@ function AiAssistant() {
   const [loading, setLoading] = useState(false);
   const [clearing, setClearing] = useState(false);
   const bottomRef = useRef(null);
-
+  const advisorRef = useRef(null);
+  const [advisorHeight, setAdvisorHeight] = useState(0);
   // AI Advisor Tab selection
   const [activeTab, setActiveTab] = useState("chat"); // chat, portfolio, simulator, recommendations, market
 
@@ -60,6 +61,19 @@ function AiAssistant() {
   // 4. Market Insights State
   const [marketInsights, setMarketInsights] = useState(null);
   const [loadingMarket, setLoadingMarket] = useState(false);
+
+  useEffect(() => {
+    if (!advisorRef.current) return;
+    const updateHeight = () => {
+      if (advisorRef.current) {
+        setAdvisorHeight(advisorRef.current.offsetHeight);
+      }
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(advisorRef.current);
+    return () => observer.disconnect();
+  }, [messages, activeTab, history, loading]);
 
   async function fetchHistory() {
     try {
@@ -202,7 +216,7 @@ function AiAssistant() {
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1fr_360px]">
           
           {/* Main AI Advisor Panel */}
-          <section className="flex min-h-[72vh] flex-col rounded-[28px] border shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <section ref={advisorRef} className="flex min-h-[72vh] flex-col rounded-[28px] border shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
             
             {/* Header Block */}
             <div className="border-b p-5" style={{ borderColor: "var(--border)" }}>
@@ -791,8 +805,7 @@ function AiAssistant() {
 
           </section>
 
-          {/* Conversation History Sidebar */}
-          <aside className="rounded-[28px] border p-5 shadow-xl h-fit" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <aside className="rounded-[28px] border p-5 shadow-xl flex flex-col self-start" style={{ background: "var(--card)", borderColor: "var(--border)", maxHeight: advisorHeight ? `${advisorHeight}px` : "72vh" }}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-black">Conversation History</h2>
@@ -807,7 +820,7 @@ function AiAssistant() {
                 {clearing ? "Clearing..." : "Clear"}
               </button>
             </div>
-            <div className="mt-4 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="mt-4 space-y-3 flex-1 overflow-y-auto pr-1">
               {history.length === 0 ? (
                 <p className="text-sm opacity-60">No AI questions yet.</p>
               ) : history.map((item) => (
