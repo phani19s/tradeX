@@ -170,7 +170,7 @@ function ForgotPassword() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center relative overflow-y-auto py-10 lg:py-0 px-4"
+      className="min-h-screen flex items-center justify-center relative overflow-y-auto overflow-x-hidden py-10 lg:py-0 px-4"
       style={{
         backgroundImage: `url(${tradingBg})`,
         backgroundSize: "cover",

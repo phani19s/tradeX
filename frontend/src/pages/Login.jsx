@@ -235,6 +235,7 @@ return (
   justify-center
   relative
   overflow-y-auto
+  overflow-x-hidden
   py-10
   lg:py-0
   "
