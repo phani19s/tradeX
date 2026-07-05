@@ -161,7 +161,7 @@ function NotificationCenter({ isOpen, onClose }) {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 z-50">
+    <div className="fixed inset-x-3 bottom-16 z-50 w-auto md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:top-full md:mt-2 md:w-96">
       <div 
         ref={modalRef}
         className="rounded-2xl border shadow-2xl overflow-hidden flex flex-col"
