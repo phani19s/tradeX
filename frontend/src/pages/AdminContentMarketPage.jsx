@@ -592,9 +592,8 @@ export default function AdminContentMarketPage() {
                 No banners generated. Click "Add Banner" to publish your first announcement.
               </div>
             ) : (
-              <>
-                <div className="overflow-x-auto rounded-xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
-                <table className="w-full border-collapse text-left text-sm">
+                <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                <table className="w-full min-w-[800px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="bg-black/5 border-b" style={{ borderColor: "var(--border)" }}>
                       <th className="py-3.5 px-4 font-bold">Image</th>
@@ -613,22 +612,22 @@ export default function AdminContentMarketPage() {
                           <img 
                             src={getFullImageUrl(b.image_url)} 
                             alt={b.title} 
-                            className="w-16 h-10 object-cover rounded-lg border shadow-sm bg-black/10"
+                            className="w-16 h-12 object-cover rounded-lg border shadow-sm bg-black/10 shrink-0"
                             style={{ borderColor: "var(--border)" }}
                             onError={(e) => { e.target.src = "https://placehold.co/100x60?text=No+Image"; }}
                           />
                         </td>
-                        <td className="py-3.5 px-4 max-w-xs">
-                          <div className="font-bold truncate text-sm">{b.title}</div>
-                          <div className="text-xs opacity-75 truncate">{b.description}</div>
+                        <td className="py-3.5 px-4 max-w-[200px]">
+                          <div className="font-bold truncate">{b.title}</div>
+                          {b.description && <div className="text-xs opacity-60 truncate">{b.description}</div>}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="rounded-full px-2.5 py-0.5 text-xs font-bold border bg-black/5" style={{ borderColor: "var(--border)" }}>
+                          <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border bg-black/5" style={{ borderColor: "var(--border)" }}>
                             {b.banner_type}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-xs">
-                          <div className="opacity-80">Start: {new Date(b.start_date).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</div>
+                          <div>Start: {new Date(b.start_date).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</div>
                           <div className="opacity-60">End: {new Date(b.end_date).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</div>
                         </td>
                         <td className="py-3.5 px-4 font-mono font-bold">{b.priority}</td>
@@ -675,83 +674,6 @@ export default function AdminContentMarketPage() {
                   </tbody>
                 </table>
               </div>
-
-              {/* Mobile Cards for Banners */}
-              <div className="block md:hidden space-y-4">
-                {banners.map((b) => (
-                  <div key={b.id} className="p-4 border rounded-3xl space-y-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
-                    <div className="flex gap-3">
-                      <img 
-                        src={getFullImageUrl(b.image_url)} 
-                        alt={b.title} 
-                        className="w-16 h-12 object-cover rounded-lg border shadow-sm bg-black/10 shrink-0"
-                        style={{ borderColor: "var(--border)" }}
-                        onError={(e) => { e.target.src = "https://placehold.co/100x60?text=No+Image"; }}
-                      />
-                      <div className="min-w-0">
-                        <div className="font-bold text-sm truncate">{b.title}</div>
-                        <div className="text-xs opacity-75 line-clamp-2">{b.description}</div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <div className="opacity-60">Type</div>
-                        <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold border bg-black/5 mt-0.5" style={{ borderColor: "var(--border)" }}>
-                          {b.banner_type}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="opacity-60">Priority</div>
-                        <span className="font-mono font-bold">{b.priority}</span>
-                      </div>
-                      <div className="col-span-2">
-                        <div className="opacity-60">Schedule</div>
-                        <div className="opacity-80">Start: {new Date(b.start_date).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</div>
-                        <div className="opacity-60">End: {new Date(b.end_date).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</div>
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: "var(--border)" }}>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleBanner(b.id)}
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-bold border transition cursor-pointer ${
-                          b.is_active 
-                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
-                            : "bg-red-500/10 text-red-500 border-red-500/20"
-                        }`}
-                      >
-                        {b.is_active ? "Active" : "Inactive"}
-                      </button>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => { setBannerPreviewData(b); setShowBannerPreview(true); }}
-                          className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
-                          style={{ borderColor: "var(--border)" }}
-                        >
-                          Preview
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditBanner(b)}
-                          className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
-                          style={{ borderColor: "var(--border)" }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteBannerId(b.id)}
-                          className="rounded-lg border border-red-500/20 text-red-500 px-2 py-1 text-xs font-bold transition hover:bg-red-500/10 cursor-pointer"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
           )}
           </div>
         )}
@@ -799,9 +721,8 @@ export default function AdminContentMarketPage() {
                   No holidays registered for {selectedHolidayYear}. Click "Add Holiday" to register your first date.
                 </div>
               ) : (
-                <>
-                  <div className="overflow-x-auto rounded-xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
-                  <table className="w-full border-collapse text-left text-sm">
+                <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                  <table className="w-full min-w-[800px] border-collapse text-left text-sm">
                     <thead>
                       <tr className="bg-black/5 border-b" style={{ borderColor: "var(--border)" }}>
                         <th className="py-3.5 px-4 font-bold">Holiday Name</th>
@@ -887,85 +808,7 @@ export default function AdminContentMarketPage() {
                     </tbody>
                   </table>
                 </div>
-
-                {/* Mobile Cards for Holidays */}
-                <div className="block md:hidden space-y-4">
-                  {holidays.map((h) => (
-                    <div key={h.id} className="p-4 border rounded-3xl space-y-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
-                      <div className="flex justify-between items-center">
-                        <div className="font-bold text-sm">{h.name}</div>
-                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                          h.market_status === 'Closed'
-                            ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                            : h.market_status === 'Open'
-                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                            : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                        }`}>
-                          {h.market_status}
-                        </span>
-                      </div>
-                      {h.description && <div className="text-xs opacity-75">{h.description}</div>}
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <div className="opacity-60">Date</div>
-                          <div>{new Date(h.date).toLocaleDateString("en-IN", { dateStyle: "medium" })}</div>
-                        </div>
-                        <div>
-                          <div className="opacity-60">Type</div>
-                          <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold border bg-black/5 mt-0.5" style={{ borderColor: "var(--border)" }}>
-                            {h.holiday_type}
-                          </span>
-                        </div>
-                        {h.market_status === "Muhurat Trading" && (
-                          <div className="col-span-2">
-                            <div className="opacity-60">Trading Hours</div>
-                            <div className="font-mono font-semibold">{h.start_time} - {h.end_time}</div>
-                          </div>
-                        )}
-                      </div>
-                      <div className="pt-2 border-t flex items-center justify-between gap-2" style={{ borderColor: "var(--border)" }}>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleHoliday(h.id)}
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-bold border transition cursor-pointer ${
-                            h.is_active 
-                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
-                              : "bg-red-500/10 text-red-500 border-red-500/20"
-                          }`}
-                        >
-                          {h.is_active ? "Enabled" : "Disabled"}
-                        </button>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setHolidayPreview(h)}
-                            className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
-                            style={{ borderColor: "var(--border)" }}
-                          >
-                            Preview
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditHoliday(h)}
-                            className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
-                            style={{ borderColor: "var(--border)" }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteHolidayId(h.id)}
-                            className="rounded-lg border border-red-500/20 text-red-500 px-2.5 py-1 text-xs font-bold transition hover:bg-red-500/10 cursor-pointer"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+              )}
             </div>
           </div>
         )}

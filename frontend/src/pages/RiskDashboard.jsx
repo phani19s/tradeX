@@ -120,47 +120,55 @@ function RiskDashboard() {
             <section className="rounded-[28px] border p-5 shadow-xl min-w-0" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
               <h2 className="text-xl font-black">Sector Allocation</h2>
               <p className="mt-1 text-sm opacity-60">Shows how much of your holdings are concentrated in each sector.</p>
-              <div className="mt-4 w-full min-w-0" style={{ height: "320px" }}>
-                  <PieChart width={500} height={320}>
-                    <Pie data={data.sector_allocation} dataKey="value" nameKey="label" outerRadius={110} label>
-                      {data.sector_allocation.map((_, index) => (
-                        <Cell key={index} fill={chartColors[index % chartColors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
+              <div className="mt-4 h-80 w-full overflow-x-auto">
+                <div className="h-full w-full min-w-[500px] lg:min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={data.sector_allocation} dataKey="value" nameKey="label" outerRadius="68%" label>
+                        {data.sector_allocation.map((_, index) => (
+                          <Cell key={index} fill={chartColors[index % chartColors.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </section>
 
             <section className="rounded-[28px] border p-5 shadow-xl min-w-0" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
               <h2 className="text-xl font-black">Stock Allocation</h2>
               <p className="mt-1 text-sm opacity-60">Large bars show stocks that dominate your portfolio value.</p>
-              <div style={{ width: "100%", height: 320 }}>
-                <BarChart
-                  width={600}
-                  height={320}
-                  data={data.stock_allocation || []}
-                >
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="label" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-                </BarChart>
+              <div className="mt-4 h-80 w-full overflow-x-auto">
+                <div className="h-full w-full min-w-[500px] lg:min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.stock_allocation || []} margin={{ top: 8, right: 8, left: -16, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis dataKey="label" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </section>
 
-            <section className="rounded-[28px] border p-5 shadow-xl lg:col-span-2" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <section className="min-w-0 rounded-[28px] border p-5 shadow-xl lg:col-span-2" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
               <h2 className="text-xl font-black">Portfolio Growth</h2>
               <p className="mt-1 text-sm opacity-60">Tracks estimated portfolio value after each recorded trade.</p>
-              <div className="mt-4 w-full min-w-0" style={{ height: "320px" }}>
-                  <LineChart width={900} height={320} data={data.portfolio_growth || []}>
-                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                    <XAxis dataKey="label" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={false} />
-                  </LineChart>
+              <div className="mt-4 h-80 w-full overflow-x-auto">
+                <div className="h-full w-full min-w-[500px] lg:min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data.portfolio_growth || []} margin={{ top: 8, right: 8, left: -16, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis dataKey="label" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </section>
 

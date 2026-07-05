@@ -409,7 +409,7 @@ export default function AdminManagement() {
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
-            <table className="w-full">
+            <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--border)" }}>
                   <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider">Administrator</th>
@@ -820,7 +820,7 @@ export default function AdminManagement() {
               </select>
             </div>
 
-            <div className="overflow-y-auto flex-1 rounded-xl border mb-4" style={{ borderColor: "var(--border)" }}>
+            <div className="overflow-y-auto overflow-x-auto flex-1 rounded-xl border mb-4" style={{ borderColor: "var(--border)" }}>
               {auditModal.loading ? (
                 <div className="flex justify-center items-center py-16">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" style={{ borderColor: "var(--accent)" }}></div>
@@ -831,7 +831,7 @@ export default function AdminManagement() {
                   <p className="text-base font-semibold">No audit logs matching selection</p>
                 </div>
               ) : (
-                <table className="w-full text-xs">
+                <table className="w-full min-w-[700px] text-xs">
                   <thead className="sticky top-0 z-10" style={{ background: "var(--card)" }}>
                     <tr className="border-b text-left font-bold opacity-75 uppercase" style={{ borderColor: "var(--border)" }}>
                       <th className="px-4 py-3">Timestamp</th>

@@ -457,7 +457,7 @@ export default function SystemSettings() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-border">
+            <table className="w-full min-w-[700px] divide-y divide-border">
               <thead>
                 <tr className="bg-surface/50 text-left text-xs font-bold uppercase tracking-wider">
                   <th className="px-4 py-3">Parameter Key</th>

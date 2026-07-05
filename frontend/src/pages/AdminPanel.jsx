@@ -425,13 +425,13 @@ function AdminPanel() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6 mt-6 items-start">
-          <div className="theme-card rounded-2xl p-6 shadow">
+          <div className="theme-card rounded-2xl p-6 shadow min-w-0 max-w-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Pending / Verified Deposits</h2>
               <span className="text-xs opacity-60">{deposits.length} total</span>
             </div>
             <div className="mt-4 overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
-              <table className="w-full">
+              <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="border-b" style={{ borderColor: "var(--border)" }}>
                     <th className="px-3 py-4 text-left text-xs whitespace-nowrap">Account</th>
@@ -506,13 +506,13 @@ function AdminPanel() {
             </div>
           </div>
 
-          <div className="theme-card rounded-2xl p-6 shadow">
+          <div className="theme-card rounded-2xl p-6 shadow min-w-0 max-w-full">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Withdrawal Requests</h2>
               <span className="text-xs opacity-60">{withdrawals.length} total</span>
             </div>
             <div className="mt-4 overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
-              <table className="w-full">
+              <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="border-b" style={{ borderColor: "var(--border)" }}>
                     <th className="px-3 py-4 text-left text-xs whitespace-nowrap">Account</th>

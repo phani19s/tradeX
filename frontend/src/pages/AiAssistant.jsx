@@ -212,14 +212,14 @@ function AiAssistant() {
     <div className="page-bg min-h-screen">
       <Navbar />
 
-      <div className="theme-main px-4 py-6 md:px-6">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="theme-main min-w-0 max-w-full px-4 py-6 md:px-6">
+        <div className="mx-auto grid min-w-0 max-w-7xl gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           
           {/* Main AI Advisor Panel */}
-          <section ref={advisorRef} className="flex min-h-[72vh] flex-col rounded-[28px] border shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <section ref={advisorRef} className="flex min-h-[72vh] min-w-0 max-w-full flex-col overflow-hidden rounded-[28px] border shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
             
             {/* Header Block */}
-            <div className="border-b p-5" style={{ borderColor: "var(--border)" }}>
+            <div className="min-w-0 border-b p-5" style={{ borderColor: "var(--border)" }}>
               <p className="text-xs font-semibold uppercase tracking-[0.35em] opacity-60">TradeX AI</p>
               <h1 className="mt-2 text-3xl font-black">AI Investment Advisor</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 opacity-70">
@@ -227,7 +227,7 @@ function AiAssistant() {
               </p>
 
               {/* Tabs Switcher */}
-              <div className="flex border-b overflow-x-auto mt-5 gap-1" style={{ borderColor: "var(--border)" }}>
+              <div className="mt-5 flex max-w-full gap-1 overflow-x-auto overscroll-x-contain border-b" style={{ borderColor: "var(--border)" }}>
                 {[
                   { id: "chat", label: "Advisor Chat" },
                   { id: "portfolio", label: "Portfolio Analysis" },
@@ -264,7 +264,7 @@ function AiAssistant() {
                   {messages.map((item, index) => (
                     <div key={`${item.role}-${index}`} className={`flex ${item.role === "user" ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 duration-150`}>
                       <div
-                        className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 ${
+                        className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 overflow-x-auto ${
                           item.role === "user" ? "text-white animate-in zoom-in-50" : "border"
                         }`}
                         style={item.role === "user"
@@ -301,7 +301,7 @@ function AiAssistant() {
                   </div>
 
                   <form
-                    className="flex gap-3"
+                    className="flex min-w-0 gap-3"
                     onSubmit={(event) => {
                       event.preventDefault();
                       sendMessage();
@@ -311,7 +311,7 @@ function AiAssistant() {
                       value={message}
                       onChange={(event) => setMessage(event.target.value)}
                       placeholder="Ask TradeX Advisor..."
-                      className="flex-1 rounded-2xl border px-4 py-3 outline-none"
+                      className="min-w-0 flex-1 rounded-2xl border px-4 py-3 outline-none"
                       style={{ background: "var(--surface)", color: "var(--text)", borderColor: "var(--border)" }}
                     />
                     <button
@@ -329,8 +329,8 @@ function AiAssistant() {
 
             {/* TAB CONTENT: PORTFOLIO ANALYSIS */}
             {activeTab === "portfolio" && (
-              <div className="flex-1 p-6 space-y-6 overflow-y-auto min-h-[450px]">
-                <div className="flex justify-between items-center bg-surface/30 p-4 rounded-2xl border" style={{ borderColor: "var(--border)" }}>
+              <div className="min-h-[450px] min-w-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
+                <div className="flex flex-col gap-4 rounded-2xl border bg-surface/30 p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--border)" }}>
                   <div>
                     <h3 className="font-bold text-base">Analyze Current Portfolio Holdings</h3>
                     <p className="text-xs opacity-60 mt-1">Evaluates asset allocation, risk metrics, diversification, and growth possibilities.</p>
@@ -462,7 +462,7 @@ function AiAssistant() {
 
             {/* TAB CONTENT: TRADING SIMULATOR */}
             {activeTab === "simulator" && (
-              <div className="flex-1 p-6 space-y-6 overflow-y-auto min-h-[450px]">
+              <div className="min-h-[450px] min-w-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
                 
                 {/* Form Inputs */}
                 <form onSubmit={runSimulation} className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 border rounded-2xl" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
@@ -613,7 +613,7 @@ function AiAssistant() {
 
             {/* TAB CONTENT: STOCK RECOMMENDATIONS */}
             {activeTab === "recommendations" && (
-              <div className="flex-1 p-6 space-y-6 overflow-y-auto min-h-[450px]">
+              <div className="min-h-[450px] min-w-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
                 
                 {/* Recommendations filter buttons */}
                 <div className="flex flex-wrap gap-2 pb-2 border-b" style={{ borderColor: "var(--border)" }}>
@@ -691,7 +691,7 @@ function AiAssistant() {
 
             {/* TAB CONTENT: MARKET INSIGHTS */}
             {activeTab === "market" && (
-              <div className="flex-1 p-6 space-y-6 overflow-y-auto min-h-[450px]">
+              <div className="min-h-[450px] min-w-0 flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
                 {loadingMarket ? (
                   <div className="flex justify-center items-center py-20">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" style={{ borderColor: "var(--accent)" }}></div>
@@ -805,7 +805,7 @@ function AiAssistant() {
 
           </section>
 
-          <aside className="rounded-[28px] border p-5 shadow-xl flex flex-col self-start" style={{ background: "var(--card)", borderColor: "var(--border)", maxHeight: advisorHeight ? `${advisorHeight}px` : "72vh" }}>
+          <aside className="flex min-w-0 max-w-full flex-col self-start rounded-[28px] border p-5 shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)", maxHeight: advisorHeight ? `${advisorHeight}px` : "72vh" }}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-black">Conversation History</h2>
@@ -824,7 +824,7 @@ function AiAssistant() {
               {history.length === 0 ? (
                 <p className="text-sm opacity-60">No AI questions yet.</p>
               ) : history.map((item) => (
-                <div key={item.id} className="relative rounded-2xl border p-4 pr-11 animate-in fade-in" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                <div key={item.id} className="relative rounded-2xl border p-4 pr-11 overflow-x-auto animate-in fade-in" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
                   <button
                     type="button"
                     onClick={() => deleteHistoryItem(item.id)}

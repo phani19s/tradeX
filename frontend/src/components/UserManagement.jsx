@@ -355,7 +355,7 @@ export default function UserManagement() {
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
-            <table className="w-full">
+            <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--border)" }}>
                   <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider">User</th>
@@ -767,7 +767,7 @@ export default function UserManagement() {
                   {/* Trades Tab */}
                   {activeActivityTab === "trades" && (
                     <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                      <table className="w-full">
+                      <table className="w-full min-w-[700px]">
                         <thead className="sticky top-0 z-10" style={{ background: "var(--card)" }}>
                           <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
                             <th className="px-4 py-3">Stock</th>
@@ -812,7 +812,7 @@ export default function UserManagement() {
                   {/* Deposits Tab */}
                   {activeActivityTab === "deposits" && (
                     <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                      <table className="w-full">
+                      <table className="w-full min-w-[650px]">
                         <thead>
                           <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
                             <th className="px-4 py-3">Amount</th>
@@ -851,7 +851,7 @@ export default function UserManagement() {
                   {/* Withdrawals Tab */}
                   {activeActivityTab === "withdrawals" && (
                     <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                      <table className="w-full">
+                      <table className="w-full min-w-[550px]">
                         <thead className="sticky top-0 z-10" style={{ background: "var(--card)" }}>
                           <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
                             <th className="px-4 py-3">Amount</th>
@@ -886,7 +886,7 @@ export default function UserManagement() {
                   {/* Watchlist Tab */}
                   {activeActivityTab === "watchlist" && (
                     <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                      <table className="w-full">
+                      <table className="w-full min-w-[550px]">
                         <thead className="sticky top-0 z-10" style={{ background: "var(--card)" }}>
                           <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
                             <th className="px-4 py-3">Stock Symbol</th>
@@ -916,7 +916,7 @@ export default function UserManagement() {
                   {/* Support Tickets Tab */}
                   {activeActivityTab === "tickets" && (
                     <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                      <table className="w-full">
+                      <table className="w-full min-w-[600px]">
                         <thead>
                           <tr className="border-b text-xs uppercase tracking-wider font-bold text-left" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
                             <th className="px-4 py-3">Ticket ID</th>
@@ -981,7 +981,7 @@ export default function UserManagement() {
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 rounded-xl border mb-4" style={{ borderColor: "var(--border)" }}>
+            <div className="overflow-y-auto overflow-x-auto flex-1 rounded-xl border mb-4" style={{ borderColor: "var(--border)" }}>
               {historyModal.loading ? (
                 <div className="flex justify-center items-center py-16">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" style={{ borderColor: "var(--accent)" }}></div>
@@ -992,7 +992,7 @@ export default function UserManagement() {
                   <p className="text-base font-semibold">No login history recorded</p>
                 </div>
               ) : (
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[800px] text-sm">
                   <thead className="sticky top-0 z-10" style={{ background: "var(--card)" }}>
                     <tr className="border-b" style={{ borderColor: "var(--border)" }}>
                       <th className="px-4 py-3 text-left text-xs font-bold uppercase">Time</th>

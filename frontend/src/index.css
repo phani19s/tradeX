@@ -191,3 +191,9 @@ input[type="checkbox"],
 .cursor-pointer {
   cursor: pointer !important;
 }
+
+@media (max-width: 767px) {
+  .theme-main {
+    padding-top: 72px !important;
+  }
+}

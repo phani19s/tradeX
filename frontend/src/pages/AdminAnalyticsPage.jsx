@@ -641,7 +641,7 @@ function AdminAnalyticsPage() {
               {/* Users Tab Content */}
               {activeTab === "users" && (
                 <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[650px] text-sm">
                     <thead>
                       <tr className="border-b text-xs uppercase tracking-wider font-bold opacity-75 text-left" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
                         <th className="px-4 py-3">Username</th>
@@ -675,7 +675,7 @@ function AdminAnalyticsPage() {
               {/* Deposits Tab Content */}
               {activeTab === "deposits" && (
                 <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[650px] text-sm">
                     <thead>
                       <tr className="border-b text-xs uppercase tracking-wider font-bold opacity-75 text-left" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
                         <th className="px-4 py-3">User</th>
@@ -714,7 +714,7 @@ function AdminAnalyticsPage() {
               {/* Withdrawals Tab Content */}
               {activeTab === "withdrawals" && (
                 <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[650px] text-sm">
                     <thead>
                       <tr className="border-b text-xs uppercase tracking-wider font-bold opacity-75 text-left" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
                         <th className="px-4 py-3">User</th>
@@ -751,7 +751,7 @@ function AdminAnalyticsPage() {
               {/* Trades Tab Content */}
               {activeTab === "trades" && (
                 <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[750px] text-sm">
                     <thead>
                       <tr className="border-b text-xs uppercase tracking-wider font-bold opacity-75 text-left" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
                         <th className="px-4 py-3">User</th>
@@ -793,7 +793,7 @@ function AdminAnalyticsPage() {
               {/* AI Requests Tab Content */}
               {activeTab === "ai_requests" && (
                 <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[650px] text-sm">
                     <thead>
                       <tr className="border-b text-xs uppercase tracking-wider font-bold opacity-75 text-left" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
                         <th className="px-4 py-3">User</th>
@@ -823,7 +823,7 @@ function AdminAnalyticsPage() {
               {/* Support Tickets Tab Content */}
               {activeTab === "support_tickets" && (
                 <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[650px] text-sm">
                     <thead>
                       <tr className="border-b text-xs uppercase tracking-wider font-bold opacity-75 text-left" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
                         <th className="px-4 py-3">Ticket ID</th>

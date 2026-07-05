@@ -364,7 +364,7 @@ export default function StockManagement() {
       {/* Stocks catalog table */}
       <div className="theme-card rounded-2xl overflow-hidden shadow">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border">
+          <table className="w-full min-w-[800px] divide-y divide-border">
             <thead>
               <tr className="bg-surface/50 text-left text-xs font-bold uppercase tracking-wider">
                 <th className="px-6 py-4">Stock Symbol</th>

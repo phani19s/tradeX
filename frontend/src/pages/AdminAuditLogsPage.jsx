@@ -401,7 +401,7 @@ export default function AdminAuditLogsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
+              <table className="w-full min-w-[800px] border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b" style={{ borderColor: "var(--border)" }}>
                     <th className="pb-3 font-extrabold uppercase tracking-wider text-xs opacity-65 pl-2">Timestamp</th>

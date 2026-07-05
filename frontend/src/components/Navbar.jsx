@@ -218,7 +218,7 @@ function Navbar() {
 
   return (
     <div
-      className="sticky top-0 z-40 max-w-full border-b"
+      className="fixed top-0 left-0 right-0 z-40 border-b md:sticky md:top-0"
       style={{ background: "var(--card)", color: "var(--text)", borderColor: "var(--border)" }}
     >
       <div className="mx-auto flex min-w-0 max-w-7xl items-center justify-between px-3 py-3 sm:px-4 md:hidden">
@@ -238,7 +238,9 @@ function Navbar() {
           aria-expanded={isMobileMenuOpen}
           onClick={() => setIsMobileMenuOpen(true)}
         >
-          <span aria-hidden="true" className="text-2xl leading-none">&#9776;</span>
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
         </button>
       </div>
 

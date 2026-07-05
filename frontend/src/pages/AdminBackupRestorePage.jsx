@@ -273,7 +273,7 @@ export default function AdminBackupRestorePage() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
-              <table className="w-full border-collapse text-left text-sm">
+              <table className="w-full min-w-[700px] border-collapse text-left text-sm">
                 <thead>
                   <tr className="bg-black/5 border-b" style={{ borderColor: "var(--border)" }}>
                     <th className="py-3.5 px-4 font-bold">Filename</th>

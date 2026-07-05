@@ -235,7 +235,7 @@ export default function TradingMonitor() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
-              <table className="w-full">
+              <table className="w-full min-w-[800px]">
                 <thead>
                   <tr className="border-b" style={{ borderColor: "var(--border)" }}>
                     <th className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider">User</th>
