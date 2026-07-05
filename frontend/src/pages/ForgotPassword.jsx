@@ -9,8 +9,10 @@ import {
   verifyForgotPasswordOtp,
 } from "../api/authApi";
 import tradingBg from "../assets/trading-bg.jpg";
+import { useTheme } from "../context/ThemeContext";
 
 function ForgotPassword() {
+  const { loginBackgroundImage } = useTheme();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -172,7 +174,7 @@ function ForgotPassword() {
     <div
       className="min-h-screen flex items-center justify-center relative overflow-y-auto overflow-x-hidden py-10 lg:py-0 px-4"
       style={{
-        backgroundImage: `url(${tradingBg})`,
+        backgroundImage: `url(${loginBackgroundImage || tradingBg})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}

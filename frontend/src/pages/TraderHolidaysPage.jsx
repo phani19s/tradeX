@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import api from "../api/api";
 import { getAuthHeaders } from "../api/authApi";
 import Navbar from "../components/Navbar";
+import ActiveBanners from "../components/ActiveBanners";
 
 export default function TraderHolidaysPage() {
   const [holidays, setHolidays] = useState([]);
@@ -43,6 +44,9 @@ export default function TraderHolidaysPage() {
 
       <div className="theme-main p-5 max-w-4xl mx-auto space-y-6">
         
+        {/* Active Banners Slider */}
+        <ActiveBanners />
+
         {/* Header Hero Card */}
         <div className="theme-card rounded-2xl p-6 shadow border" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }}>
           <h1 className="text-4xl font-bold flex items-center gap-2">
@@ -114,41 +118,60 @@ export default function TraderHolidaysPage() {
             </div>
           ) : (
             <div className="grid gap-4">
-              {holidays.map((h) => (
-                <div 
-                  key={h.id} 
-                  className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 rounded-2xl border bg-black/5 hover:bg-black/10 transition gap-4"
-                  style={{ borderColor: "var(--border)" }}
-                >
-                  <div className="space-y-1">
-                    <span className="text-xs font-bold opacity-60 uppercase tracking-wider">{h.holiday_type}</span>
-                    <h3 className="text-xl font-bold">{h.name}</h3>
-                    {h.description && <p className="text-xs opacity-75 max-w-xl">{h.description}</p>}
-                  </div>
-
-                  <div className="flex sm:flex-col items-start sm:items-end gap-3 sm:gap-1 whitespace-nowrap">
-                    {/* Date */}
-                    <div className="font-mono text-sm font-bold">
-                      {new Date(h.date).toLocaleDateString("en-IN", {
-                        weekday: "short", year: "numeric", month: "short", day: "numeric"
-                      })}
-                    </div>
+              {holidays.map((h) => {
+                const hasImage = !!h.image_url;
+                const resolvedImageUrl = hasImage 
+                  ? (h.image_url.startsWith("http") ? h.image_url : `${api.defaults.baseURL}${h.image_url}`)
+                  : null;
+                
+                return (
+                  <div 
+                    key={h.id} 
+                    className="relative overflow-hidden flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 rounded-2xl border transition gap-4 bg-black/5 hover:bg-black/10"
+                    style={{ borderColor: "var(--border)" }}
+                  >
+                    {hasImage && (
+                      <>
+                        <img 
+                          src={resolvedImageUrl} 
+                          alt={h.name}
+                          className="absolute inset-0 w-full h-full object-cover z-0 select-none opacity-40 brightness-[0.7] contrast-[1.05]"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent z-10" />
+                      </>
+                    )}
                     
-                    {/* Status Badge */}
-                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                      h.market_status === 'Closed'
-                        ? 'bg-red-500/10 text-red-500 border-red-500/20'
-                        : h.market_status === 'Open'
-                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                        : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                    }`}>
-                      {h.market_status === "Muhurat Trading" 
-                        ? `Muhurat: ${h.start_time} - ${h.end_time}` 
-                        : h.market_status}
-                    </span>
+                    <div className={`space-y-1 z-20 ${hasImage ? "text-white" : ""}`}>
+                      <span className={`text-xs font-bold uppercase tracking-wider ${hasImage ? "text-rose-300 opacity-90" : "opacity-60"}`}>{h.holiday_type}</span>
+                      <h3 className="text-xl font-bold">{h.name}</h3>
+                      {h.description && <p className={`text-xs ${hasImage ? "text-slate-200 opacity-95" : "opacity-75"} max-w-xl`}>{h.description}</p>}
+                    </div>
+
+                    <div className={`flex sm:flex-col items-start sm:items-end gap-3 sm:gap-1 whitespace-nowrap z-20 ${hasImage ? "text-white" : ""}`}>
+                      {/* Date */}
+                      <div className="font-mono text-sm font-bold">
+                        {new Date(h.date).toLocaleDateString("en-IN", {
+                          weekday: "short", year: "numeric", month: "short", day: "numeric"
+                        })}
+                      </div>
+                      
+                      {/* Status Badge */}
+                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                        h.market_status === 'Closed'
+                          ? (hasImage ? 'bg-red-500/25 text-red-300 border-red-500/40 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'bg-red-500/10 text-red-500 border-red-500/20')
+                          : h.market_status === 'Open'
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                      }`}>
+                        {h.market_status === "Muhurat Trading" 
+                          ? `Muhurat: ${h.start_time} - ${h.end_time}` 
+                          : h.market_status}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

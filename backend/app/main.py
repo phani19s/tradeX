@@ -602,6 +602,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+from fastapi.staticfiles import StaticFiles
+import os
+
+os.makedirs("static/uploads", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.include_router(auth_router)
 app.include_router(admin_router)

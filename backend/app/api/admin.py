@@ -3530,7 +3530,38 @@ def restore_backup(
         backup_lock.release()
 
 
-
+@router.post("/upload")
+def upload_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    import os
+    import shutil
+    import uuid
+    
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+        
+    os.makedirs("static/uploads", exist_ok=True)
+    
+    file_ext = os.path.splitext(file.filename)[1]
+    new_filename = f"{uuid.uuid4()}{file_ext}"
+    dest_path = os.path.join("static/uploads", new_filename)
+    
+    try:
+        with open(dest_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        image_url = f"/static/uploads/{new_filename}"
+        return {"image_url": image_url}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
 
 
 # ==========================================
@@ -3984,3 +4015,47 @@ def get_upcoming_holidays(
             upcoming = list(reversed(past_holidays)) + upcoming
             
     return upcoming
+
+
+@router.get("/settings/background")
+def get_background(db: Session = Depends(get_db)):
+    from app.models.system_setting import SystemSetting
+    app_bg = db.query(SystemSetting).filter(SystemSetting.key == "app_background_image").first()
+    login_bg = db.query(SystemSetting).filter(SystemSetting.key == "login_background_image").first()
+    return {
+        "app_background_image": app_bg.value if app_bg else None,
+        "login_background_image": login_bg.value if login_bg else None
+    }
+
+
+@router.post("/settings/background")
+def update_background(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from app.models.system_setting import SystemSetting
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    app_bg_val = payload.get("app_background_image")
+    login_bg_val = payload.get("login_background_image")
+    
+    if "app_background_image" in payload:
+        setting = db.query(SystemSetting).filter(SystemSetting.key == "app_background_image").first()
+        if not setting:
+            setting = SystemSetting(key="app_background_image", value=app_bg_val or "")
+            db.add(setting)
+        else:
+            setting.value = app_bg_val or ""
+            
+    if "login_background_image" in payload:
+        setting = db.query(SystemSetting).filter(SystemSetting.key == "login_background_image").first()
+        if not setting:
+            setting = SystemSetting(key="login_background_image", value=login_bg_val or "")
+            db.add(setting)
+        else:
+            setting.value = login_bg_val or ""
+        
+    db.commit()
+    return {"message": "Background images updated successfully"}

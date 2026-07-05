@@ -265,7 +265,7 @@ function Dashboard() {
 
 
         {data && (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {stats.map((item) => (
               <div
                 key={item.label}
@@ -305,7 +305,7 @@ function Dashboard() {
         
           </div>
         
-          <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         
             {stocks.map(stock => {
         
@@ -402,7 +402,7 @@ function Dashboard() {
           <div className="mt-6 grid gap-8 lg:grid-cols-2">
             <div id="deposits">
               <h3 className="text-lg font-bold mb-4">Deposits</h3>
-              <div className="overflow-hidden rounded-3xl border" style={{ borderColor: "var(--border)" }}>
+              <div className="overflow-hidden rounded-3xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
                 <table className="w-full">
                   <thead>
                     <tr className="border-b" style={{ borderColor: "var(--border)" }}>
@@ -453,6 +453,44 @@ function Dashboard() {
                 </table>
               </div>
 
+              {/* Mobile Cards for Deposits */}
+              <div className="block md:hidden space-y-4">
+                {deposits.length === 0 ? (
+                  <div className="p-6 text-center text-sm opacity-70 border rounded-3xl" style={{ borderColor: "var(--border)" }}>No deposits yet.</div>
+                ) : (
+                  deposits.slice(0, visibleDepositCount).map((deposit) => (
+                    <div key={deposit.id} className="p-4 border rounded-3xl space-y-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs opacity-60">{new Date(deposit.created_at).toLocaleDateString()}</span>
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold ${getStatusTone(deposit.status)}`}>
+                          {deposit.status || "Pending"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-lg font-bold text-green-500">+₹{formatMoney(deposit.amount)}</span>
+                        <span className="text-xs font-mono">{deposit.utr_number || "-"}</span>
+                      </div>
+                      {isAdmin && <div className="text-[10px] opacity-60">User: {deposit.target_email}</div>}
+                      <div className="pt-2 border-t flex justify-end" style={{ borderColor: "var(--border)" }}>
+                        <button
+                          onClick={() => {
+                            const label = getTicketActionLabel(deposit.id, "DEPOSIT");
+                            if (label === "Raise Ticket") {
+                              setTicketModal({ isOpen: true, type: "DEPOSIT", id: deposit.id });
+                            } else {
+                              navigate("/profile/tickets");
+                            }
+                          }}
+                          className={`text-xs font-bold hover:underline ${getTicketActionColor(deposit.id, "DEPOSIT")}`}
+                        >
+                          {getTicketActionLabel(deposit.id, "DEPOSIT")}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
               <div className="mt-4 flex justify-center gap-4">
                 {visibleDepositCount < deposits.length && (
                   <button
@@ -479,7 +517,7 @@ function Dashboard() {
 
             <div id="withdrawals">
               <h3 className="text-lg font-bold mb-4">Withdrawals</h3>
-              <div className="overflow-hidden rounded-3xl border" style={{ borderColor: "var(--border)" }}>
+              <div className="overflow-hidden rounded-3xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
                 <table className="w-full">
                   <thead>
                     <tr className="border-b" style={{ borderColor: "var(--border)" }}>
@@ -539,6 +577,54 @@ function Dashboard() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Cards for Withdrawals */}
+              <div className="block md:hidden space-y-4">
+                {withdrawals.length === 0 ? (
+                  <div className="p-6 text-center text-sm opacity-70 border rounded-3xl" style={{ borderColor: "var(--border)" }}>No withdrawals yet.</div>
+                ) : (
+                  withdrawals.slice(0, visibleWithdrawalCount).map((w) => (
+                    <div key={w.id} className="p-4 border rounded-3xl space-y-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs opacity-60">{new Date(w.created_at).toLocaleDateString()}</span>
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-semibold ${getStatusTone(w.status)}`}>
+                          {w.status}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-lg font-bold text-red-500">-₹{formatMoney(w.amount)}</span>
+                        <div className="text-right text-xs">
+                          {w.bank_name ? (
+                            <>
+                              <div className="font-medium">{w.bank_name}</div>
+                              <div className="opacity-60">{w.account_number}</div>
+                            </>
+                          ) : null}
+                          {w.upi_id && (
+                            <div className="text-accent font-bold">UPI: {w.upi_id}</div>
+                          )}
+                        </div>
+                      </div>
+                      {w.utr_number && <div className="text-[10px] font-bold text-accent">UTR: {w.utr_number}</div>}
+                      <div className="pt-2 border-t flex justify-end" style={{ borderColor: "var(--border)" }}>
+                        <button
+                          onClick={() => {
+                            const label = getTicketActionLabel(w.id, "WITHDRAWAL");
+                            if (label === "Raise Ticket") {
+                              setTicketModal({ isOpen: true, type: "WITHDRAWAL", id: w.id });
+                            } else {
+                              navigate("/profile/tickets");
+                            }
+                          }}
+                          className={`text-xs font-bold hover:underline ${getTicketActionColor(w.id, "WITHDRAWAL")}`}
+                        >
+                          {getTicketActionLabel(w.id, "WITHDRAWAL")}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="mt-4 flex justify-center gap-4">

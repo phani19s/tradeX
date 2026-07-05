@@ -171,7 +171,7 @@ function Portfolio() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-3xl border" style={{ borderColor: "var(--border)" }}>
+          <div className="mt-5 overflow-hidden rounded-3xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
             <table className="w-full">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--border)" }}>
@@ -263,6 +263,92 @@ function Portfolio() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Cards for Portfolio Holdings */}
+          <div className="block md:hidden space-y-4 mt-5">
+            {holdings.length === 0 ? (
+              <div className="p-6 text-center text-sm opacity-70 border rounded-3xl" style={{ borderColor: "var(--border)" }}>
+                No holdings yet.
+              </div>
+            ) : (
+              holdings.map((holding) => {
+                const orders = sltpOrders.filter(o => o.symbol === holding.symbol);
+                return (
+                  <div key={holding.symbol} className="p-4 border rounded-3xl space-y-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-semibold text-lg">{holding.symbol}</div>
+                        <div className="text-xs opacity-60">{holding.company_name}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs opacity-60">Qty</div>
+                        <div className="font-semibold text-sm">{holding.quantity}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <div className="opacity-60">Buy Price</div>
+                        <div className="font-semibold">₹{formatMoney(holding.buy_price)}</div>
+                      </div>
+                      <div>
+                        <div className="opacity-60">Current Price</div>
+                        <div className="font-semibold">₹{formatMoney(holding.current_price)}</div>
+                      </div>
+                      <div>
+                        <div className="opacity-60">Profit / Loss</div>
+                        <div className={`font-semibold ${holding.profit_loss >= 0 ? "text-green-500" : "text-red-500"}`}>
+                          ₹{formatMoney(holding.profit_loss)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="opacity-60">Market Value</div>
+                        <div className="font-bold">₹{formatMoney(holding.market_value)}</div>
+                      </div>
+                    </div>
+
+                    {/* Limits list */}
+                    {orders.length > 0 && (
+                      <div className="p-2.5 rounded-2xl bg-black/10 border text-[10px] leading-tight space-y-1.5" style={{ borderColor: "var(--border)" }}>
+                        <div className="font-semibold opacity-70">Active Limits:</div>
+                        {orders.map((order, idx) => (
+                          <div key={idx} className="flex flex-col border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                            {order.sl_price && (
+                              <span className="text-red-500 font-bold">
+                                SL: ₹{formatMoney(order.sl_price)} ({order.quantity})
+                              </span>
+                            )}
+                            {order.tp_price && (
+                              <span className="text-green-500 font-bold">
+                                TP: ₹{formatMoney(order.tp_price)} ({order.quantity})
+                              </span>
+                            )}
+                            {order.buy_price && (
+                              <span className="text-amber-500 font-bold">
+                                Auto-Buy: ₹{formatMoney(order.buy_price)} ({order.quantity})
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t flex justify-end" style={{ borderColor: "var(--border)" }}>
+                      <button
+                        onClick={() => {
+                          setSelectedHolding(holding);
+                          setIsModalOpen(true);
+                        }}
+                        className="rounded-xl px-4 py-2 text-xs font-bold text-white transition hover:opacity-80"
+                        style={{ backgroundColor: "var(--accent)" }}
+                      >
+                        Modify
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
 
         {autoBuyOrders.length > 0 && (
@@ -285,7 +371,7 @@ function Portfolio() {
               </div>
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-3xl border" style={{ borderColor: "var(--border)" }}>
+            <div className="mt-5 overflow-hidden rounded-3xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
               <table className="w-full">
                 <thead>
                   <tr className="border-b" style={{ borderColor: "var(--border)" }}>
@@ -321,6 +407,36 @@ function Portfolio() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Cards for Auto-Buy Orders */}
+            <div className="block md:hidden space-y-4 mt-5">
+              {autoBuyOrders.map((order) => (
+                <div key={order.id} className="p-4 border rounded-3xl space-y-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-lg">{order.symbol}</span>
+                    <span className="text-xs opacity-75">Qty: {order.quantity}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-xs opacity-60">Target Price</span>
+                    <span className="font-bold text-amber-500">₹{formatMoney(order.buy_price)}</span>
+                  </div>
+                  <div className="pt-2 border-t flex justify-end gap-2" style={{ borderColor: "var(--border)" }}>
+                    <button
+                      onClick={() => modifyOrder(order)}
+                      className="rounded-xl px-4 py-2 text-xs font-bold text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/10 transition"
+                    >
+                      Modify
+                    </button>
+                    <button
+                      onClick={() => setOrderToCancel(order.id)}
+                      className="rounded-xl px-4 py-2 text-xs font-bold text-rose-500 border border-rose-500/20 hover:bg-rose-500/10 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

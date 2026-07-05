@@ -221,7 +221,7 @@ function History() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-3xl border" style={{ borderColor: "var(--border)" }}>
+          <div className="mt-5 overflow-hidden rounded-3xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
             <table className="w-full">
               <thead>
                 <tr className="border-b" style={{ borderColor: "var(--border)" }}>
@@ -286,6 +286,58 @@ function History() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Cards for History */}
+          <div className="block md:hidden space-y-4 mt-5">
+            {allActivity.length === 0 ? (
+              <div className="p-6 text-center text-sm opacity-70 border rounded-3xl" style={{ borderColor: "var(--border)" }}>
+                No activity yet.
+              </div>
+            ) : (
+              allActivity.map((trade, index) => (
+                <div 
+                  key={`${trade.stock_symbol}-${index}`} 
+                  className={`p-4 border rounded-3xl space-y-3 ${trade.isPending ? "opacity-70 bg-accent/5" : ""}`}
+                  style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                >
+                  <div className="flex justify-between items-center">
+                    <span
+                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                        trade.trade_type === "BUY"
+                          ? "bg-emerald-500/15 text-emerald-500"
+                          : trade.trade_type === "LIMIT BUY"
+                          ? "bg-amber-500/15 text-amber-500"
+                          : "bg-rose-500/15 text-rose-500"
+                      }`}
+                    >
+                      {trade.trade_type}
+                    </span>
+                    <span className="text-xs font-semibold">Qty: {trade.quantity}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
+                    <div>
+                      <div className="font-semibold text-lg">{trade.stock_symbol}</div>
+                      <div className="text-xs opacity-60">{trade.company_name}</div>
+                    </div>
+                    <span className="text-lg font-bold">₹{formatMoney(trade.price)}</span>
+                  </div>
+                  <div className="text-xs italic opacity-70">
+                    {trade.note || (trade.trade_type === "BUY" ? "Manual Purchase" : "Manual Sale")}
+                  </div>
+                  <div className="pt-2 border-t flex justify-end" style={{ borderColor: "var(--border)" }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTrade(trade)}
+                      className="rounded-xl border px-4 py-2 text-xs font-bold transition hover:opacity-80"
+                      style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+                    >
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

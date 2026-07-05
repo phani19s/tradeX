@@ -156,7 +156,7 @@ function LoginHistory() {
               <div className="p-10 text-center opacity-60">No login activity has been recorded yet.</div>
             ) : (
               <>
-                <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: "var(--border)" }}>
+                <div className="overflow-x-auto rounded-2xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
                   <table className="w-full text-left">
                     <thead className="border-b" style={{ borderColor: "var(--border)" }}>
                       <tr>
@@ -221,6 +221,67 @@ function LoginHistory() {
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile Cards for LoginHistory */}
+                <div className="block md:hidden space-y-4">
+                  {visibleHistory.length === 0 ? (
+                    <div className="p-6 text-center text-sm opacity-70 border rounded-3xl" style={{ borderColor: "var(--border)" }}>
+                      No login activity matches your filters.
+                    </div>
+                  ) : (
+                    visibleHistory.map((item) => {
+                      const loginStatus = getLoginStatus(item);
+                      const sessionStatus = getSessionStatus(item);
+                      const endedSession = isEndedSession(item);
+
+                      return (
+                        <div 
+                          key={item.id} 
+                          className="p-4 border rounded-3xl space-y-3"
+                          style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs opacity-60 font-semibold">{formatSecurityDate(item.login_time)}</span>
+                            <div className="flex gap-1.5">
+                              <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${getStatusClass(loginStatus)}`}>
+                                {loginStatus}
+                              </span>
+                              {sessionStatus !== "-" && (
+                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${getSessionStatusClass(sessionStatus)}`}>
+                                  {sessionStatus}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <div className="opacity-60">Device</div>
+                              <div className="font-semibold">{formatDevice(item.device, item.browser)}</div>
+                            </div>
+                            <div>
+                              <div className="opacity-60">IP Address</div>
+                              <div className="font-mono">{item.ip_address || "Unknown"}</div>
+                            </div>
+                            <div className="col-span-2">
+                              <div className="opacity-60">Location</div>
+                              <div>{item.location || "Unknown Location"}</div>
+                            </div>
+                          </div>
+                          {(endedSession || sessionStatus === "Active") && (
+                            <div className="pt-2 border-t text-xs flex justify-between" style={{ borderColor: "var(--border)" }}>
+                              <span>Duration:</span>
+                              {endedSession ? (
+                                <span className="font-semibold">{formatDuration(getEndedSessionDuration(item))}</span>
+                              ) : (
+                                <span className="font-bold text-emerald-500">Still Active</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3">

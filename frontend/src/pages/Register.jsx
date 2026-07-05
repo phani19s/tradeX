@@ -8,8 +8,10 @@ import {
 } from "react-toastify";
 
 import tradingBg from "../assets/trading-bg.jpg";
+import { useTheme } from "../context/ThemeContext";
 
 function Register() {
+  const { loginBackgroundImage } = useTheme();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -252,7 +254,7 @@ return (
   lg:py-0
   "
   style={{
-    backgroundImage: `url(${tradingBg})`,
+    backgroundImage: `url(${loginBackgroundImage || tradingBg})`,
     backgroundSize: "cover",
     backgroundPosition: "center"
   }}

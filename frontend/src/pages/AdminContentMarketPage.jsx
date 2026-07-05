@@ -5,10 +5,18 @@ import api from "../api/api";
 import { getAuthHeaders } from "../api/authApi";
 import Navbar from "../components/Navbar";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { useTheme } from "../context/ThemeContext";
 
 export default function AdminContentMarketPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("banners"); // "banners" or "holidays"
+  const { resolvedThemeClass, backgroundImage, updateAppBackground, loginBackgroundImage, updateLoginBackground } = useTheme();
+  const isLightTheme = resolvedThemeClass !== "theme-dark";
+
+  const getFullImageUrl = (url) => {
+    if (!url) return "";
+    return url.startsWith("http") ? url : `${api.defaults.baseURL}${url}`;
+  };
 
   // ----------------------------------------
   // BANNERS STATE
@@ -51,6 +59,7 @@ export default function AdminContentMarketPage() {
 
   // Holiday Form states
   const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [holidayPreview, setHolidayPreview] = useState(null);
   const [editingHoliday, setEditingHoliday] = useState(null);
   const [holidayFormData, setHolidayFormData] = useState({
     name: "",
@@ -65,6 +74,23 @@ export default function AdminContentMarketPage() {
   });
   
   const [deleteHolidayId, setDeleteHolidayId] = useState(null);
+
+  // Background state variables
+  const [bgInputUrl, setBgInputUrl] = useState("");
+  const [loginBgInputUrl, setLoginBgInputUrl] = useState("");
+  const [savingBg, setSavingBg] = useState(false);
+
+  useEffect(() => {
+    if (backgroundImage) {
+      setBgInputUrl(backgroundImage);
+    }
+  }, [backgroundImage]);
+
+  useEffect(() => {
+    if (loginBackgroundImage) {
+      setLoginBgInputUrl(loginBackgroundImage);
+    }
+  }, [loginBackgroundImage]);
 
   // ----------------------------------------
   // ACTIONS & FETCHERS
@@ -315,6 +341,165 @@ export default function AdminContentMarketPage() {
     }
   };
 
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setUploadingImage(true);
+    try {
+      const res = await api.post("/admin/upload", formData, {
+        headers: {
+          ...getAuthHeaders().headers,
+          "Content-Type": "multipart/form-data"
+        }
+      });
+      const url = res.data.image_url;
+      if (type === "banner") {
+        setBannerFormData((prev) => ({ ...prev, image_url: url }));
+      } else if (type === "holiday") {
+        setHolidayFormData((prev) => ({ ...prev, image_url: url }));
+      }
+      toast.success("Image uploaded successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || "Failed to upload image.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSaveBackground = async (e) => {
+    e.preventDefault();
+    setSavingBg(true);
+    try {
+      await api.post("/admin/settings/background", { app_background_image: bgInputUrl }, getAuthHeaders());
+      updateAppBackground(bgInputUrl);
+      toast.success("Main background image updated successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || "Failed to update background image.");
+    } finally {
+      setSavingBg(false);
+    }
+  };
+
+  const handleClearBackground = async () => {
+    setSavingBg(true);
+    try {
+      await api.post("/admin/settings/background", { app_background_image: "" }, getAuthHeaders());
+      updateAppBackground("");
+      setBgInputUrl("");
+      toast.success("Background image cleared. Restored default theme background.");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || "Failed to clear background image.");
+    } finally {
+      setSavingBg(false);
+    }
+  };
+
+  const handleBgUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setUploadingImage(true);
+    try {
+      const res = await api.post("/admin/upload", formData, {
+        headers: {
+          ...getAuthHeaders().headers,
+          "Content-Type": "multipart/form-data"
+        }
+      });
+      const url = res.data.image_url;
+      setBgInputUrl(url);
+      toast.success("Background image uploaded successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || "Failed to upload image.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSaveLoginBackground = async (e) => {
+    e.preventDefault();
+    setSavingBg(true);
+    try {
+      await api.post("/admin/settings/background", { login_background_image: loginBgInputUrl }, getAuthHeaders());
+      updateLoginBackground(loginBgInputUrl);
+      toast.success("Login background image updated successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || "Failed to update login background image.");
+    } finally {
+      setSavingBg(false);
+    }
+  };
+
+  const handleClearLoginBackground = async () => {
+    setSavingBg(true);
+    try {
+      await api.post("/admin/settings/background", { login_background_image: "" }, getAuthHeaders());
+      updateLoginBackground("");
+      setLoginBgInputUrl("");
+      toast.success("Login background image cleared. Restored default starting background.");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || "Failed to clear login background image.");
+    } finally {
+      setSavingBg(false);
+    }
+  };
+
+  const handleLoginBgUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setUploadingImage(true);
+    try {
+      const res = await api.post("/admin/upload", formData, {
+        headers: {
+          ...getAuthHeaders().headers,
+          "Content-Type": "multipart/form-data"
+        }
+      });
+      const url = res.data.image_url;
+      setLoginBgInputUrl(url);
+      toast.success("Login background image uploaded successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.detail || "Failed to upload image.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   return (
     <div className="page-bg min-h-screen">
       <Navbar />
@@ -333,7 +518,7 @@ export default function AdminContentMarketPage() {
               </p>
             </div>
             <div>
-              {activeTab === "banners" ? (
+              {activeTab === "banners" && (
                 <button
                   onClick={handleOpenAddBanner}
                   className="rounded-xl bg-accent text-white px-5 py-2.5 text-sm font-bold shadow hover:bg-accent/90 cursor-pointer transition flex items-center gap-1"
@@ -341,7 +526,8 @@ export default function AdminContentMarketPage() {
                 >
                   ➕ Add Banner
                 </button>
-              ) : (
+              )}
+              {activeTab === "holidays" && (
                 <button
                   onClick={handleOpenAddHoliday}
                   className="rounded-xl bg-accent text-white px-5 py-2.5 text-sm font-bold shadow hover:bg-accent/90 cursor-pointer transition flex items-center gap-1"
@@ -377,6 +563,17 @@ export default function AdminContentMarketPage() {
             >
               Market Holidays
             </button>
+            <button
+              onClick={() => setActiveTab("background")}
+              className={`px-6 py-2.5 font-bold text-sm transition border-b-2 cursor-pointer ${
+                activeTab === "background"
+                  ? "border-accent text-accent"
+                  : "border-transparent opacity-60 hover:opacity-100"
+              }`}
+              style={activeTab === "background" ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}
+            >
+              Application Background
+            </button>
           </div>
         </div>
 
@@ -395,7 +592,8 @@ export default function AdminContentMarketPage() {
                 No banners generated. Click "Add Banner" to publish your first announcement.
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+              <>
+                <div className="overflow-x-auto rounded-xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
                 <table className="w-full border-collapse text-left text-sm">
                   <thead>
                     <tr className="bg-black/5 border-b" style={{ borderColor: "var(--border)" }}>
@@ -413,7 +611,7 @@ export default function AdminContentMarketPage() {
                       <tr key={b.id} className="hover:bg-black/5 transition animate-in fade-in duration-150">
                         <td className="py-3.5 px-4">
                           <img 
-                            src={b.image_url} 
+                            src={getFullImageUrl(b.image_url)} 
                             alt={b.title} 
                             className="w-16 h-10 object-cover rounded-lg border shadow-sm bg-black/10"
                             style={{ borderColor: "var(--border)" }}
@@ -477,7 +675,84 @@ export default function AdminContentMarketPage() {
                   </tbody>
                 </table>
               </div>
-            )}
+
+              {/* Mobile Cards for Banners */}
+              <div className="block md:hidden space-y-4">
+                {banners.map((b) => (
+                  <div key={b.id} className="p-4 border rounded-3xl space-y-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                    <div className="flex gap-3">
+                      <img 
+                        src={getFullImageUrl(b.image_url)} 
+                        alt={b.title} 
+                        className="w-16 h-12 object-cover rounded-lg border shadow-sm bg-black/10 shrink-0"
+                        style={{ borderColor: "var(--border)" }}
+                        onError={(e) => { e.target.src = "https://placehold.co/100x60?text=No+Image"; }}
+                      />
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm truncate">{b.title}</div>
+                        <div className="text-xs opacity-75 line-clamp-2">{b.description}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <div className="opacity-60">Type</div>
+                        <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold border bg-black/5 mt-0.5" style={{ borderColor: "var(--border)" }}>
+                          {b.banner_type}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="opacity-60">Priority</div>
+                        <span className="font-mono font-bold">{b.priority}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <div className="opacity-60">Schedule</div>
+                        <div className="opacity-80">Start: {new Date(b.start_date).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</div>
+                        <div className="opacity-60">End: {new Date(b.end_date).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</div>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: "var(--border)" }}>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleBanner(b.id)}
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-bold border transition cursor-pointer ${
+                          b.is_active 
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
+                            : "bg-red-500/10 text-red-500 border-red-500/20"
+                        }`}
+                      >
+                        {b.is_active ? "Active" : "Inactive"}
+                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setBannerPreviewData(b); setShowBannerPreview(true); }}
+                          className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
+                          style={{ borderColor: "var(--border)" }}
+                        >
+                          Preview
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditBanner(b)}
+                          className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
+                          style={{ borderColor: "var(--border)" }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteBannerId(b.id)}
+                          className="rounded-lg border border-red-500/20 text-red-500 px-2 py-1 text-xs font-bold transition hover:bg-red-500/10 cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           </div>
         )}
 
@@ -524,7 +799,8 @@ export default function AdminContentMarketPage() {
                   No holidays registered for {selectedHolidayYear}. Click "Add Holiday" to register your first date.
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-xl border" style={{ borderColor: "var(--border)" }}>
+                <>
+                  <div className="overflow-x-auto rounded-xl border md:block hidden" style={{ borderColor: "var(--border)" }}>
                   <table className="w-full border-collapse text-left text-sm">
                     <thead>
                       <tr className="bg-black/5 border-b" style={{ borderColor: "var(--border)" }}>
@@ -584,6 +860,14 @@ export default function AdminContentMarketPage() {
                           <td className="py-3.5 px-4 text-center space-x-2 whitespace-nowrap">
                             <button
                               type="button"
+                              onClick={() => setHolidayPreview(h)}
+                              className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
+                              style={{ borderColor: "var(--border)" }}
+                            >
+                              Preview
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handleOpenEditHoliday(h)}
                               className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
                               style={{ borderColor: "var(--border)" }}
@@ -603,7 +887,238 @@ export default function AdminContentMarketPage() {
                     </tbody>
                   </table>
                 </div>
-              )}
+
+                {/* Mobile Cards for Holidays */}
+                <div className="block md:hidden space-y-4">
+                  {holidays.map((h) => (
+                    <div key={h.id} className="p-4 border rounded-3xl space-y-3" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                      <div className="flex justify-between items-center">
+                        <div className="font-bold text-sm">{h.name}</div>
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                          h.market_status === 'Closed'
+                            ? 'bg-red-500/10 text-red-500 border-red-500/20'
+                            : h.market_status === 'Open'
+                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                        }`}>
+                          {h.market_status}
+                        </span>
+                      </div>
+                      {h.description && <div className="text-xs opacity-75">{h.description}</div>}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <div className="opacity-60">Date</div>
+                          <div>{new Date(h.date).toLocaleDateString("en-IN", { dateStyle: "medium" })}</div>
+                        </div>
+                        <div>
+                          <div className="opacity-60">Type</div>
+                          <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold border bg-black/5 mt-0.5" style={{ borderColor: "var(--border)" }}>
+                            {h.holiday_type}
+                          </span>
+                        </div>
+                        {h.market_status === "Muhurat Trading" && (
+                          <div className="col-span-2">
+                            <div className="opacity-60">Trading Hours</div>
+                            <div className="font-mono font-semibold">{h.start_time} - {h.end_time}</div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="pt-2 border-t flex items-center justify-between gap-2" style={{ borderColor: "var(--border)" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleHoliday(h.id)}
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-bold border transition cursor-pointer ${
+                            h.is_active 
+                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" 
+                              : "bg-red-500/10 text-red-500 border-red-500/20"
+                          }`}
+                        >
+                          {h.is_active ? "Enabled" : "Disabled"}
+                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setHolidayPreview(h)}
+                            className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
+                            style={{ borderColor: "var(--border)" }}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditHoliday(h)}
+                            className="rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:bg-black/5 cursor-pointer"
+                            style={{ borderColor: "var(--border)" }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteHolidayId(h.id)}
+                            className="rounded-lg border border-red-500/20 text-red-500 px-2.5 py-1 text-xs font-bold transition hover:bg-red-500/10 cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            </div>
+          </div>
+        )}
+
+        {/* BACKGROUND TAB CONTAINER */}
+        {activeTab === "background" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-200">
+            {/* Main Application Background Form */}
+            <div className="theme-card rounded-2xl p-6 shadow border space-y-6" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }}>
+              <div>
+                <h2 className="text-xl font-bold">🖥️ Main Application Background</h2>
+                <p className="text-xs opacity-70 mt-1">
+                  Set the background image of the dashboard, trading, and portal pages globally.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveBackground} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold opacity-75 mb-1 block">Background Image (URL or Local File)</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      value={bgInputUrl}
+                      onChange={(e) => setBgInputUrl(e.target.value)}
+                      className="flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none"
+                      style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                      placeholder="e.g., https://images.unsplash.com/... or upload below"
+                    />
+                    <label 
+                      className="rounded-xl border px-4 py-2 text-xs font-bold flex items-center justify-center gap-1.5 transition hover:bg-black/5 cursor-pointer shrink-0 text-center"
+                      style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+                    >
+                      {uploadingImage ? "Uploading..." : "📂 Choose File"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleBgUpload}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {bgInputUrl && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold opacity-60 uppercase block">Background Image Preview</span>
+                    <div className="relative rounded-2xl overflow-hidden border bg-black/10 h-40 max-w-md" style={{ borderColor: "var(--border)" }}>
+                      <img 
+                        src={getFullImageUrl(bgInputUrl)} 
+                        alt="Background Preview" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.target.src = "https://placehold.co/600x400?text=Invalid+Image+URL"; }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={savingBg}
+                    className="rounded-xl bg-accent text-white px-5 py-2.5 text-sm font-bold shadow hover:bg-accent/90 cursor-pointer transition disabled:opacity-50"
+                    style={{ background: "var(--accent)" }}
+                  >
+                    {savingBg ? "Saving..." : "Save Background"}
+                  </button>
+                  {backgroundImage && (
+                    <button
+                      type="button"
+                      onClick={handleClearBackground}
+                      disabled={savingBg}
+                      className="rounded-xl border border-red-500/20 text-red-500 px-5 py-2.5 text-sm font-bold transition hover:bg-red-500/10 cursor-pointer disabled:opacity-50"
+                    >
+                      Clear Background
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            {/* Login & Portal Background Form */}
+            <div className="theme-card rounded-2xl p-6 shadow border space-y-6" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }}>
+              <div>
+                <h2 className="text-xl font-bold">🔒 Login Page Background</h2>
+                <p className="text-xs opacity-70 mt-1">
+                  Set the background image of the Login, Register, and Password Reset screens globally.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveLoginBackground} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold opacity-75 mb-1 block">Background Image (URL or Local File)</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      value={loginBgInputUrl}
+                      onChange={(e) => setLoginBgInputUrl(e.target.value)}
+                      className="flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none"
+                      style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                      placeholder="e.g., https://images.unsplash.com/... or upload below"
+                    />
+                    <label 
+                      className="rounded-xl border px-4 py-2 text-xs font-bold flex items-center justify-center gap-1.5 transition hover:bg-black/5 cursor-pointer shrink-0 text-center"
+                      style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+                    >
+                      {uploadingImage ? "Uploading..." : "📂 Choose File"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLoginBgUpload}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {loginBgInputUrl && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold opacity-60 uppercase block">Background Image Preview</span>
+                    <div className="relative rounded-2xl overflow-hidden border bg-black/10 h-40 max-w-md" style={{ borderColor: "var(--border)" }}>
+                      <img 
+                        src={getFullImageUrl(loginBgInputUrl)} 
+                        alt="Login Background Preview" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.target.src = "https://placehold.co/600x400?text=Invalid+Image+URL"; }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={savingBg}
+                    className="rounded-xl bg-accent text-white px-5 py-2.5 text-sm font-bold shadow hover:bg-accent/90 cursor-pointer transition disabled:opacity-50"
+                    style={{ background: "var(--accent)" }}
+                  >
+                    {savingBg ? "Saving..." : "Save Background"}
+                  </button>
+                  {loginBackgroundImage && (
+                    <button
+                      type="button"
+                      onClick={handleClearLoginBackground}
+                      disabled={savingBg}
+                      className="rounded-xl border border-red-500/20 text-red-500 px-5 py-2.5 text-sm font-bold transition hover:bg-red-500/10 cursor-pointer disabled:opacity-50"
+                    >
+                      Clear Background
+                    </button>
+                  )}
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -695,16 +1210,31 @@ export default function AdminContentMarketPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-bold opacity-75 mb-1 block">Image URL *</label>
-                  <input
-                    type="text"
-                    required
-                    value={bannerFormData.image_url}
-                    onChange={(e) => setBannerFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                    className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none"
-                    style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-                    placeholder="URL to banner graphic"
-                  />
+                  <label className="text-xs font-bold opacity-75 mb-1 block">Image Selection (URL or File) *</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      required
+                      value={bannerFormData.image_url}
+                      onChange={(e) => setBannerFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                      className="flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none"
+                      style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                      placeholder="Enter Image URL"
+                    />
+                    <label 
+                      className="rounded-xl border px-4 py-2 text-xs font-bold flex items-center justify-center gap-1.5 transition hover:bg-black/5 cursor-pointer shrink-0 text-center"
+                      style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+                    >
+                      {uploadingImage ? "Uploading..." : "📂 Choose File"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleImageUpload(e, "banner")}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                    </label>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -761,7 +1291,7 @@ export default function AdminContentMarketPage() {
                   <span className="text-[11px] font-bold opacity-60 uppercase block mb-1">Live Image Preview</span>
                   {bannerFormData.image_url ? (
                     <img 
-                      src={bannerFormData.image_url} 
+                      src={getFullImageUrl(bannerFormData.image_url)} 
                       alt="Live Preview" 
                       className="w-full h-24 object-cover rounded-lg border bg-white"
                       style={{ borderColor: "var(--border)" }}
@@ -815,7 +1345,7 @@ export default function AdminContentMarketPage() {
           <div className="w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl border animate-in fade-in zoom-in-95 duration-150" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
             <div className="relative h-48 sm:h-56 bg-black/10">
               <img 
-                src={bannerPreviewData.image_url} 
+                src={getFullImageUrl(bannerPreviewData.image_url)} 
                 alt={bannerPreviewData.title} 
                 className="w-full h-full object-cover"
                 onError={(e) => { e.target.src = "https://placehold.co/800x300?text=Preview+Image+Failed"; }}
@@ -976,15 +1506,48 @@ export default function AdminContentMarketPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold opacity-75 mb-1 block">Banner Background Image URL (Optional)</label>
-                <input
-                  type="text"
-                  value={holidayFormData.image_url}
-                  onChange={(e) => setHolidayFormData(prev => ({ ...prev, image_url: e.target.value }))}
-                  className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none"
-                  style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-                  placeholder="e.g. https://images.unsplash.com/... (leave empty for automatic themed image)"
-                />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-bold opacity-75 block">Banner Background (URL or File) (Optional)</label>
+                  {holidayFormData.image_url && (
+                    <button
+                      type="button"
+                      onClick={() => setHolidayPreview({
+                        name: holidayFormData.name || "Holiday Name",
+                        description: holidayFormData.description || "Holiday Description",
+                        market_status: holidayFormData.market_status,
+                        holiday_type: holidayFormData.holiday_type,
+                        image_url: holidayFormData.image_url
+                      })}
+                      className="text-xs font-bold text-accent hover:underline cursor-pointer"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      Preview Banner
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={holidayFormData.image_url}
+                    onChange={(e) => setHolidayFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                    className="flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none"
+                    style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                    placeholder="Enter Image URL (or upload below)"
+                  />
+                  <label 
+                    className="rounded-xl border px-4 py-2 text-xs font-bold flex items-center justify-center gap-1.5 transition hover:bg-black/5 cursor-pointer shrink-0 text-center"
+                    style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+                  >
+                    {uploadingImage ? "Uploading..." : "📂 Choose File"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(e, "holiday")}
+                      className="hidden"
+                      disabled={uploadingImage}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="flex gap-3 justify-end pt-4 border-t" style={{ borderColor: "var(--border)" }}>
@@ -1034,6 +1597,71 @@ export default function AdminContentMarketPage() {
         onConfirm={handleDeleteHolidayConfirm}
         onCancel={() => setDeleteHolidayId(null)}
       />
+
+      {/* Holiday Banner Preview Modal */}
+      {holidayPreview && (
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="theme-card rounded-3xl max-w-2xl w-full p-6 shadow-2xl border space-y-4 my-8 animate-in fade-in zoom-in-95 duration-150" style={{ borderColor: "var(--border)", background: "var(--card)", color: "var(--text)" }}>
+            <div className="flex justify-between items-center pb-2 border-b" style={{ borderColor: "var(--border)" }}>
+              <h3 className="text-xl font-bold">🗺️ Holiday Banner Preview</h3>
+              <button onClick={() => setHolidayPreview(null)} className="text-lg font-bold opacity-60 hover:opacity-100 p-1 cursor-pointer">✕</button>
+            </div>
+            
+            <p className="text-xs opacity-60">This is how the holiday banner will render in user accounts (dashboard view):</p>
+            
+            {/* The Holiday Banner Card - exactly like ActiveBanners */}
+            <div 
+              className="w-full relative overflow-hidden rounded-3xl border transition duration-300 flex group mb-2 shadow-lg" 
+              style={{ borderColor: "var(--border)", background: "var(--card)" }}
+            >
+              <div className="relative w-full bg-black/10 flex flex-col justify-stretch h-44 sm:h-52">
+                <img
+                  src={getFullImageUrl(holidayPreview.image_url) || "https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=60"}
+                  alt={holidayPreview.name}
+                  className={`w-full h-full object-cover select-none absolute inset-0 transition-all duration-300 ${
+                    isLightTheme ? "opacity-90 contrast-[0.95] brightness-[1.02]" : "opacity-50 brightness-[0.75] contrast-[1.05]"
+                  }`}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+                
+                {/* Overlay gradient */}
+                <div className={`absolute inset-0 bg-gradient-to-r p-8 flex flex-col justify-center space-y-3 transition-colors duration-300 ${
+                  isLightTheme 
+                    ? "from-[var(--card)] via-[var(--card)]/80 to-[var(--card)]/10 text-[var(--text)]" 
+                    : "from-black/85 via-black/55 to-transparent text-white"
+                }`}>
+                  <span className="rounded-full bg-accent/90 backdrop-blur w-fit px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white" style={{ background: "var(--accent)" }}>
+                    Holiday
+                  </span>
+                  <h3 className={`font-black max-w-lg truncate ${isLightTheme ? "text-[var(--text)]" : "text-white"} text-xl sm:text-2xl`}>
+                    {holidayPreview.market_status === "Muhurat Trading" ? `Muhurat Trading Active: ${holidayPreview.name}` : `Market Closed: ${holidayPreview.name}`}
+                  </h3>
+                  <p className="max-w-md opacity-85 leading-relaxed text-xs line-clamp-2">
+                    {holidayPreview.description 
+                      ? (holidayPreview.market_status === "Muhurat Trading" 
+                        ? `Special Muhurat Trading session is open today from ${holidayPreview.start_time || "17:30"} to ${holidayPreview.end_time || "18:30"}. ${holidayPreview.description}`
+                        : `Trading is disabled today due to the ${holidayPreview.name} market holiday. ${holidayPreview.description}`)
+                      : (holidayPreview.market_status === "Muhurat Trading"
+                        ? `Special Muhurat Trading session is open today from ${holidayPreview.start_time || "17:30"} to ${holidayPreview.end_time || "18:30"}.`
+                        : `Trading is disabled today due to the ${holidayPreview.name} market holiday.`)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setHolidayPreview(null)}
+                className="rounded-xl border px-4 py-2 text-sm font-bold hover:bg-black/5 cursor-pointer"
+                style={{ borderColor: "var(--border)" }}
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

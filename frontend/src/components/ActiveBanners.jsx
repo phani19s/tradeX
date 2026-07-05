@@ -49,7 +49,9 @@ export default function ActiveBanners({ onBannersLoaded, isLoginPage = false }) 
     return "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=800&auto=format&fit=crop&q=60"; // Generic trading
   };
 
-  const imageUrl = current.image_url || getFallbackImage();
+  const imageUrl = current.image_url 
+    ? (current.image_url.startsWith("http") ? current.image_url : `${api.defaults.baseURL}${current.image_url}`)
+    : getFallbackImage();
 
   return (
     <div 

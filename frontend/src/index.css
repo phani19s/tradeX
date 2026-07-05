@@ -10,7 +10,11 @@ body,
 body {
   margin: 0;
   --accent-contrast: #ffffff;
-  background: var(--bg);
+  background: var(--bg-image, var(--bg));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text);
   transition: background-color 0.25s ease, color 0.25s ease;
 }
@@ -44,14 +48,22 @@ body {
 .page-bg {
 
   min-height: 100vh;
-  background: var(--bg);
+  background: var(--bg-image, var(--bg));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text);
 
 }
 
 .theme-main {
   min-height: 100vh;
-  background: var(--bg);
+  background: var(--bg-image, var(--bg));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text);
 }
 

@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from "react";
+import api from "../api/api";
 
 const ThemeContext = createContext(null);
 
@@ -215,6 +216,66 @@ export function ThemeProvider({ children }) {
     resolveTheme(initialPreferences.mode, initialPreferences.accent, initialPreferences.timeConfigs)
   );
 
+  const [backgroundImage, setBackgroundImage] = useState(null);
+  const [loginBackgroundImage, setLoginBackgroundImage] = useState(null);
+
+  const fetchBackgroundImage = async () => {
+    try {
+      const res = await api.get("/admin/settings/background");
+      if (res.data) {
+        if (res.data.app_background_image) {
+          const fullUrl = res.data.app_background_image.startsWith("http") 
+            ? res.data.app_background_image 
+            : `${api.defaults.baseURL}${res.data.app_background_image}`;
+          setBackgroundImage(fullUrl);
+        } else {
+          setBackgroundImage(null);
+        }
+        
+        if (res.data.login_background_image) {
+          const fullUrl = res.data.login_background_image.startsWith("http") 
+            ? res.data.login_background_image 
+            : `${api.defaults.baseURL}${res.data.login_background_image}`;
+          setLoginBackgroundImage(fullUrl);
+        } else {
+          setLoginBackgroundImage(null);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch background image:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackgroundImage();
+  }, []);
+
+  useEffect(() => {
+    if (backgroundImage) {
+      document.documentElement.style.setProperty("--bg-image", `url('${backgroundImage}')`);
+    } else {
+      document.documentElement.style.removeProperty("--bg-image");
+    }
+  }, [backgroundImage]);
+
+  const updateAppBackground = (url) => {
+    if (url) {
+      const fullUrl = url.startsWith("http") ? url : `${api.defaults.baseURL}${url}`;
+      setBackgroundImage(fullUrl);
+    } else {
+      setBackgroundImage(null);
+    }
+  };
+
+  const updateLoginBackground = (url) => {
+    if (url) {
+      const fullUrl = url.startsWith("http") ? url : `${api.defaults.baseURL}${url}`;
+      setLoginBackgroundImage(fullUrl);
+    } else {
+      setLoginBackgroundImage(null);
+    }
+  };
+
   useEffect(() => {
     const syncTheme = () => {
       const resolved = resolveTheme(themeMode, accentTheme, timeConfigs);
@@ -295,6 +356,10 @@ export function ThemeProvider({ children }) {
         currentThemeName: themeState.themeName,
         activePeriod: themeState.activePeriod,
         resolvedThemeClass: themeState.className,
+        backgroundImage,
+        updateAppBackground,
+        loginBackgroundImage,
+        updateLoginBackground,
       }}
     >
       {children}
