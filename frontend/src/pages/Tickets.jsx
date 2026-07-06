@@ -34,7 +34,7 @@ function Tickets() {
   }
 
   return (
-    <div className="page-bg min-h-screen">
+    <div className="page-bg min-h-screen overflow-y-auto scroll-smooth">
       <Navbar />
       
       <div className="theme-main px-4 py-8 md:px-6">
@@ -53,49 +53,95 @@ function Tickets() {
             </Link>
           </div>
 
-          <div className="rounded-[28px] border overflow-hidden shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+          <div className="rounded-[28px] border md:overflow-hidden overflow-visible shadow-xl" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
             {loading ? (
               <div className="p-10 text-center opacity-60">Loading your tickets...</div>
             ) : tickets.length === 0 ? (
               <div className="p-10 text-center opacity-60">You haven't raised any support tickets yet.</div>
             ) : (
-              <table className="w-full text-left">
-                <thead className="border-b" style={{ borderColor: "var(--border)" }}>
-                  <tr>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Ticket #</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Issue Type</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Description</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Date</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Status</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <>
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                  <table className="w-full text-left">
+                    <thead className="border-b" style={{ borderColor: "var(--border)" }}>
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Ticket #</th>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Issue Type</th>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Description</th>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Date</th>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Status</th>
+                        <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider opacity-60">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tickets.map(ticket => (
+                        <tr key={ticket.id} className="border-b last:border-0 hover:bg-white/5 transition" style={{ borderColor: "var(--border)" }}>
+                          <td className="px-6 py-4 font-bold">{ticket.ticket_number}</td>
+                          <td className="px-6 py-4">{ticket.issue_type}</td>
+                          <td className="px-6 py-4 text-sm max-w-[200px] truncate" title={ticket.description}>{ticket.description}</td>
+                          <td className="px-6 py-4 text-sm opacity-80">
+                            {new Date(ticket.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase ${getStatusStyle(ticket.status)}`}>
+                              {ticket.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <Link 
+                              to={`/profile/tickets/${ticket.id}`}
+                              className="text-accent hover:underline text-sm font-bold"
+                            >
+                              View Details
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="block md:hidden p-4 space-y-4">
                   {tickets.map(ticket => (
-                    <tr key={ticket.id} className="border-b last:border-0 hover:bg-white/5 transition" style={{ borderColor: "var(--border)" }}>
-                      <td className="px-6 py-4 font-bold">{ticket.ticket_number}</td>
-                      <td className="px-6 py-4">{ticket.issue_type}</td>
-                      <td className="px-6 py-4 text-sm max-w-[200px] truncate" title={ticket.description}>{ticket.description}</td>
-                      <td className="px-6 py-4 text-sm opacity-80">
-                        {new Date(ticket.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4">
+                    <div 
+                      key={ticket.id} 
+                      className="p-5 border rounded-3xl space-y-3"
+                      style={{ borderColor: "var(--border)", background: "var(--surface)" }}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm">Ticket #{ticket.ticket_number}</span>
                         <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase ${getStatusStyle(ticket.status)}`}>
                           {ticket.status}
                         </span>
-                      </td>
-                      <td className="px-6 py-4">
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <div className="opacity-60 font-semibold uppercase tracking-wider text-[10px]">Issue Type</div>
+                          <div className="font-bold mt-0.5">{ticket.issue_type}</div>
+                        </div>
+                        <div>
+                          <div className="opacity-60 font-semibold uppercase tracking-wider text-[10px]">Date</div>
+                          <div className="font-medium mt-0.5">{new Date(ticket.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <div className="col-span-2">
+                          <div className="opacity-60 font-semibold uppercase tracking-wider text-[10px]">Description</div>
+                          <div className="mt-0.5 break-words text-sm opacity-90">{ticket.description}</div>
+                        </div>
+                      </div>
+                      <div className="pt-3 border-t flex justify-end" style={{ borderColor: "var(--border)" }}>
                         <Link 
                           to={`/profile/tickets/${ticket.id}`}
-                          className="text-accent hover:underline text-sm font-bold"
+                          className="text-accent hover:underline text-xs font-bold"
+                          style={{ color: "var(--accent)" }}
                         >
                           View Details
                         </Link>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </>
             )}
           </div>
         </div>

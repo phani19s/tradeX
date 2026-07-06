@@ -89,9 +89,9 @@ function StockChart({ symbol, currentPrice, previousClose }) {
   ];
 
   return (
-    <div className="w-full mt-6 rounded-3xl border p-4" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+    <div className="w-full min-w-0 mt-6 rounded-3xl border p-4 overflow-hidden" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
       {/* Top Controls Area */}
-      <div className="flex justify-between items-center mb-4 pb-4 border-b" style={{ borderColor: "var(--border)" }}>
+      <div className="flex flex-row justify-between items-center mb-4 pb-4 border-b min-w-0 w-full gap-2" style={{ borderColor: "var(--border)" }}>
         <div>
           <span className="text-[9px] uppercase tracking-[0.2em] opacity-50 font-black">{symbol} Chart</span>
         </div>
@@ -123,7 +123,7 @@ function StockChart({ symbol, currentPrice, previousClose }) {
       </div>
 
       {/* Chart Area */}
-      <div className="flex h-52 gap-4">
+      <div className="flex h-52 gap-4 min-w-0 w-full">
         {/* Fixed Y-Axis Labels */}
         <div className="flex flex-col justify-between text-[10px] font-bold opacity-40 py-1 min-w-[45px]">
           {yLabels.map((val, i) => (
@@ -180,7 +180,7 @@ function StockChart({ symbol, currentPrice, previousClose }) {
         </div>
       </div>
 
-      <div className="flex justify-between mt-4 ml-[49px] opacity-40 text-[9px] font-black uppercase tracking-widest">
+      <div className="flex justify-between mt-4 ml-[49px] opacity-40 text-[9px] font-black uppercase tracking-widest gap-2 flex-wrap">
         <span>History</span>
         <span>-20 Days</span>
         <span>-10 Days</span>

@@ -343,12 +343,14 @@ function Navbar() {
               aria-label="Notifications"
               aria-expanded={showNotifications && notificationAnchor === "mobile"}
             >
-              <span aria-hidden="true">&#128276;</span>
-              {unreadCount > 0 && (
-                <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
+              <span className="relative inline-flex">
+                <span aria-hidden="true">&#128276;</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </span>
             </button>
             <NotificationCenter
               isOpen={showNotifications && notificationAnchor === "mobile"}
@@ -411,12 +413,14 @@ function Navbar() {
               title="Notifications"
               aria-label="Notifications"
             >
-              &#128276;
-              {unreadCount > 0 && (
-                <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
+              <span className="relative inline-flex">
+                &#128276;
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </span>
             </button>
             <NotificationCenter
               isOpen={showNotifications && notificationAnchor === "tablet"}
@@ -534,12 +538,14 @@ function Navbar() {
               className="p-2 rounded-full transition hover:bg-black/5 flex items-center justify-center relative"
               title="Notifications"
             >
-              🔔
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
+              <span className="relative inline-flex">
+                🔔
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </span>
             </button>
             <NotificationCenter
               isOpen={showNotifications && notificationAnchor === "desktop"}

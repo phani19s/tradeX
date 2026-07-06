@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { toast } from "react-toastify";
 
 import api from "../api/api";
@@ -59,6 +59,25 @@ function Trade() {
   const [limitPrice, setLimitPrice] = useState("");
   const [selectedStock, setSelectedStock] = useState("");
   const [holdings, setHoldings] = useState([]);
+  const orderSectionRef = useRef(null);
+
+  const scrollToBuySell = () => {
+    setTimeout(() => {
+      if (orderSectionRef.current) {
+        orderSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 50);
+  };
+
+  useEffect(() => {
+    if (selectedStock) {
+      setLimitPrice("");
+      setQuantity("");
+      if (orderSectionRef.current) {
+        orderSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, [selectedStock]);
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState(null);
 
@@ -253,6 +272,10 @@ function Trade() {
       toast.error("Enter a valid limit price");
       return;
     }
+    if (selectedStockData && Number(limitPrice) >= Number(selectedStockData.current_price)) {
+      toast.error(`Auto-Buy price must be less than current price (₹${formatPrice(selectedStockData.current_price)})`);
+      return;
+    }
     setLoading(true);
     try {
       const response = await api.post(
@@ -402,7 +425,10 @@ function Trade() {
                   key={stock.id}
                   type="button"
                   disabled={!stock.is_active}
-                  onClick={() => setSelectedStock(String(stock.id))}
+                  onClick={() => {
+                    setSelectedStock(String(stock.id));
+                    scrollToBuySell();
+                  }}
                   className="rounded-3xl border p-5 text-left shadow-lg transition enabled:hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-55"
                   style={{
                     background: isSelected ? "var(--accent-soft)" : "var(--card)",
@@ -477,7 +503,9 @@ function Trade() {
           </div>
 
           <div
-            className="rounded-3xl border p-6 shadow-lg"
+            ref={orderSectionRef}
+            id="buy-sell-order-section"
+            className="rounded-3xl border p-4 sm:p-6 shadow-lg scroll-mt-20 md:scroll-mt-24 w-full min-w-0 overflow-hidden"
             style={{ background: "var(--card)", borderColor: "var(--border)" }}
           >
             <div className="flex items-start justify-between gap-4">
@@ -499,7 +527,7 @@ function Trade() {
               className="mt-6 rounded-2xl border p-4"
               style={{ background: "var(--surface)", borderColor: "var(--border)" }}
             >
-              <div className="flex justify-between items-start">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.25em] opacity-60">
                     Selected Stock
@@ -508,43 +536,79 @@ function Trade() {
                     <p className="text-4xl font-black uppercase tracking-tight">
                       {selectedStockData ? selectedStockData.symbol : "None"}
                     </p>
-                    <p className="mt-1 text-sm font-medium opacity-60">
+                    <p className="mt-1 text-sm font-medium opacity-60 font-semibold leading-relaxed">
                       {selectedStockData
                         ? selectedStockData.company_name
                         : "Click a stock card to load it here."}
                     </p>
+                    {selectedStockData && (
+                      <p 
+                        onClick={() => setLimitPrice(String(selectedStockData.current_price))}
+                        className="mt-1.5 text-xs font-bold text-accent cursor-pointer hover:underline inline-block"
+                        title="Click to copy to Auto-Buy price"
+                      >
+                        Current Price: ₹{formatPrice(selectedStockData.current_price)}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-1.5">
+                <div className="flex flex-col items-start sm:items-end gap-1.5 w-full sm:w-auto">
                   {stockAdvice && (
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-col items-start sm:items-end gap-2 w-full sm:w-auto">
                       <span className={`text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 rounded-lg ${stockAdvice.bg} ${stockAdvice.color} border border-current/10`}>
                         {stockAdvice.label}
                       </span>
                       {selectedStockData?.is_active && (
-                          <div className="flex flex-col items-end gap-1.5">
-                            <input
-                              type="number"
-                              step="0.01"
-                              placeholder="Price..."
-                              value={limitPrice}
-                              onChange={(e) => setLimitPrice(e.target.value)}
-                              className="w-24 text-[10px] rounded-lg border px-2 py-1 bg-transparent outline-none focus:border-accent transition"
-                              style={{ borderColor: "var(--border)" }}
-                            />
+                          <div className="flex flex-row sm:flex-col items-center sm:items-end gap-1.5 w-full sm:w-auto flex-wrap">
+                            <div className="relative group flex items-center w-full sm:w-28">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentVal = parseFloat(limitPrice) || parseFloat(selectedStockData?.current_price) || 0;
+                                  setLimitPrice((Math.max(0, currentVal - 1)).toFixed(2));
+                                }}
+                                className="absolute left-2 flex h-4 w-4 items-center justify-center rounded-full text-xs font-black transition-all duration-200 select-none opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="Price..."
+                                value={limitPrice}
+                                onChange={(e) => setLimitPrice(e.target.value)}
+                                onFocus={() => {
+                                  if (!limitPrice && selectedStockData) {
+                                    setLimitPrice(String(selectedStockData.current_price));
+                                  }
+                                }}
+                                className="w-full text-center text-[10px] rounded-lg border py-1 pl-6 pr-6 bg-transparent outline-none focus:border-accent transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                style={{ borderColor: "var(--border)" }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentVal = parseFloat(limitPrice) || parseFloat(selectedStockData?.current_price) || 0;
+                                  setLimitPrice((currentVal + 1).toFixed(2));
+                                }}
+                                className="absolute right-2 flex h-4 w-4 items-center justify-center rounded-full text-xs font-black transition-all duration-200 select-none opacity-0 group-hover:opacity-100 hover:text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
+                              >
+                                +
+                              </button>
+                            </div>
                             <input
                               type="number"
                               placeholder="Qty..."
                               value={quantity}
                               onChange={(e) => setQuantity(e.target.value)}
-                              className="w-24 text-[10px] rounded-lg border px-2 py-1 bg-transparent outline-none focus:border-accent transition"
+                              className="w-full sm:w-24 text-[10px] rounded-lg border px-2 py-1 bg-transparent outline-none focus:border-accent transition"
                               style={{ borderColor: "var(--border)" }}
                             />
                             <button
                               onClick={setLimitBuy}
-                              disabled={!selectedStockData?.is_active || !limitPrice || !quantity || loading}
-                              className="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg hover:opacity-90 disabled:opacity-50 transition"
+                              disabled={!selectedStockData?.is_active || !limitPrice || !quantity || loading || Number(limitPrice) >= Number(selectedStockData.current_price)}
+                              className="w-full sm:w-auto text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg hover:opacity-90 disabled:opacity-50 transition"
                               style={{
                                 background: "var(--accent)",
                                 color: "var(--button-text)",
@@ -555,16 +619,21 @@ function Trade() {
                             </button>
                             <button
                               onClick={() => { setLimitPrice(""); setQuantity(""); }}
-                              className="text-[8px] font-bold uppercase tracking-tight opacity-50 hover:opacity-100 transition"
+                              className="w-full sm:w-auto text-[8px] font-bold uppercase tracking-tight opacity-50 hover:opacity-100 transition"
                             >
                               Cancel
                             </button>
                           </div>
                       )}
+                      {limitPrice && Number(limitPrice) >= Number(selectedStockData?.current_price) && (
+                        <p className="text-[9px] font-semibold text-rose-500 mt-1 max-w-[150px] text-left sm:text-right">
+                          *Auto-Buy price must be less than current price (₹{formatPrice(selectedStockData.current_price)})
+                        </p>
+                      )}
                     </div>
                   )}
                   {selectedStockData && ownedQuantity > 0 && (
-                    <div className="text-right">
+                    <div className="text-left sm:text-right w-full sm:w-auto mt-2 sm:mt-0">
                       <p className="text-xs font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full inline-block">
                         Owned: {ownedQuantity}
                       </p>
@@ -584,7 +653,12 @@ function Trade() {
               <select
                 id="trade-stock"
                 value={selectedStock}
-                onChange={(e) => setSelectedStock(e.target.value)}
+                onChange={(e) => {
+                  setSelectedStock(e.target.value);
+                  if (e.target.value) {
+                    scrollToBuySell();
+                  }
+                }}
                 className="w-full rounded-2xl border px-4 py-3 text-base outline-none transition focus:ring-2"
                 style={{
                   background: "var(--surface)",

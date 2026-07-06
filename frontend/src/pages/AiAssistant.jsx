@@ -35,6 +35,7 @@ function AiAssistant() {
   const [clearing, setClearing] = useState(false);
   const bottomRef = useRef(null);
   const advisorRef = useRef(null);
+  const isFirstRender = useRef(true);
   const [advisorHeight, setAdvisorHeight] = useState(0);
   // AI Advisor Tab selection
   const [activeTab, setActiveTab] = useState("chat"); // chat, portfolio, simulator, recommendations, market
@@ -89,6 +90,10 @@ function AiAssistant() {
   }, []);
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
@@ -212,7 +217,7 @@ function AiAssistant() {
     <div className="page-bg min-h-screen">
       <Navbar />
 
-      <div className="theme-main min-w-0 max-w-full px-4 py-6 md:px-6">
+      <div className="theme-main min-w-0 max-w-full px-4 pt-0 pb-6 md:px-6 md:pt-0">
         <div className="mx-auto grid min-w-0 max-w-7xl gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           
           {/* Main AI Advisor Panel */}

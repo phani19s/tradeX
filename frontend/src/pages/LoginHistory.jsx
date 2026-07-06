@@ -106,7 +106,7 @@ function LoginHistory() {
   }
 
   return (
-    <div className="page-bg min-h-screen">
+    <div className="page-bg min-h-screen overflow-y-auto scroll-smooth">
       <Navbar />
 
       <div className="theme-main px-4 py-8 md:px-6">

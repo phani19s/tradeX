@@ -36,6 +36,16 @@ function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
     fetchExistingSLTP();
   }, [fetchExistingSLTP]);
 
+  useEffect(() => {
+    if (isOpen) {
+      setSlPrice("");
+      setTpPrice("");
+      setQuantity("");
+      setError("");
+      setEditingTarget(null);
+    }
+  }, [isOpen, holding]);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
@@ -46,6 +56,24 @@ function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
 
       if (!requestedQuantity || requestedQuantity > maxSellQuantity) {
         setError("Not available stocks");
+        setLoading(false);
+        return;
+      }
+
+      if (slPrice && Number(slPrice) >= Number(holding.current_price)) {
+        setError("Stop Loss price must be less than current price");
+        setLoading(false);
+        return;
+      }
+
+      if (tpPrice && Number(tpPrice) <= Number(holding.current_price)) {
+        setError("Take Profit price must be greater than current price");
+        setLoading(false);
+        return;
+      }
+
+      if (!slPrice && !tpPrice) {
+        setError("Please set at least one target (Stop Loss or Take Profit)");
         setLoading(false);
         return;
       }
@@ -126,6 +154,11 @@ function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
   const totalAssignedQuantity = existingOrders.reduce((sum, o) => sum + o.quantity, 0);
   const remainingVolume = holding ? Math.max(holding.quantity - totalAssignedQuantity, 0) : 0;
   const maxSellQuantity = editingTarget ? remainingVolume + editingTarget.quantity : remainingVolume;
+
+  const isSlValid = !slPrice || Number(slPrice) < Number(holding?.current_price || 0);
+  const isTpValid = !tpPrice || Number(tpPrice) > Number(holding?.current_price || 0);
+  const hasAtLeastOneTarget = Boolean(slPrice) || Boolean(tpPrice);
+  const isFormValid = isSlValid && isTpValid && hasAtLeastOneTarget && Number(quantity) > 0 && Number(quantity) <= maxSellQuantity;
 
   if (!isOpen) return null;
 
@@ -237,37 +270,110 @@ function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <h3 className="ml-1 text-xs font-bold uppercase tracking-wider opacity-60">
-              {editingTarget ? "Edit Target" : "Add New Target"}
-            </h3>
-            <div>
-              <label className="mb-2 ml-1 block text-xs font-bold uppercase tracking-wider opacity-60">
-                Stop Loss (SL) Price
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={slPrice}
-                onChange={(e) => setSlPrice(e.target.value)}
-                placeholder="Sell if price drops below..."
-                className="w-full rounded-2xl border bg-transparent p-4 outline-none transition focus:border-red-500/50"
-                style={{ borderColor: "var(--border)" }}
-              />
+            <div className="flex justify-between items-center ml-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider opacity-60">
+                {editingTarget ? "Edit Target" : "Add New Target"}
+              </h3>
+              {holding && (
+                <span className="text-[10px] font-bold opacity-55">
+                  Current Price: Rs. {holding.current_price}
+                </span>
+              )}
             </div>
 
             <div>
               <label className="mb-2 ml-1 block text-xs font-bold uppercase tracking-wider opacity-60">
-                Take Profit (TP) Price
+                Stop Loss (SL) Price {holding && `(Current: Rs. ${holding.current_price})`}
               </label>
-              <input
-                type="number"
-                step="0.01"
-                value={tpPrice}
-                onChange={(e) => setTpPrice(e.target.value)}
-                placeholder="Sell if price rises above..."
-                className="w-full rounded-2xl border bg-transparent p-4 outline-none transition focus:border-green-500/50"
-                style={{ borderColor: "var(--border)" }}
-              />
+              <div className="relative group flex items-center w-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentVal = parseFloat(slPrice) || parseFloat(holding?.current_price) || 0;
+                    setSlPrice((Math.max(0, currentVal - 1)).toFixed(2));
+                  }}
+                  className="absolute left-3 flex h-8 w-8 items-center justify-center rounded-full text-lg font-black transition-all duration-200 select-none opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={slPrice}
+                  onChange={(e) => setSlPrice(e.target.value)}
+                  onFocus={() => {
+                    if (!slPrice && holding) setSlPrice(String(holding.current_price));
+                  }}
+                  placeholder="Sell if price drops below..."
+                  className="w-full text-center rounded-2xl border bg-transparent p-4 pl-12 pr-12 outline-none transition focus:border-red-500/50 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  style={{ borderColor: "var(--border)" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentVal = parseFloat(slPrice) || parseFloat(holding?.current_price) || 0;
+                    setSlPrice((currentVal + 1).toFixed(2));
+                  }}
+                  className="absolute right-3 flex h-8 w-8 items-center justify-center rounded-full text-lg font-black transition-all duration-200 select-none opacity-0 group-hover:opacity-100 hover:text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
+                >
+                  +
+                </button>
+              </div>
+              {slPrice && Number(slPrice) >= Number(holding?.current_price) && (
+                <p className="text-[10px] font-semibold text-rose-500 mt-1.5 ml-1">
+                  *Stop Loss price must be less than current price (Rs. {holding.current_price})
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-2 ml-1 block text-xs font-bold uppercase tracking-wider opacity-60">
+                Take Profit (TP) Price {holding && `(Current: Rs. ${holding.current_price})`}
+              </label>
+              <div className="relative group flex items-center w-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentVal = parseFloat(tpPrice) || parseFloat(holding?.current_price) || 0;
+                    setTpPrice((Math.max(0, currentVal - 1)).toFixed(2));
+                  }}
+                  className="absolute left-3 flex h-8 w-8 items-center justify-center rounded-full text-lg font-black transition-all duration-200 select-none opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={tpPrice}
+                  onChange={(e) => setTpPrice(e.target.value)}
+                  onFocus={() => {
+                    if (!tpPrice && holding) setTpPrice(String(holding.current_price));
+                  }}
+                  placeholder="Sell if price rises above..."
+                  className="w-full text-center rounded-2xl border bg-transparent p-4 pl-12 pr-12 outline-none transition focus:border-green-500/50 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  style={{ borderColor: "var(--border)" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentVal = parseFloat(tpPrice) || parseFloat(holding?.current_price) || 0;
+                    setTpPrice((currentVal + 1).toFixed(2));
+                  }}
+                  className="absolute right-3 flex h-8 w-8 items-center justify-center rounded-full text-lg font-black transition-all duration-200 select-none opacity-0 group-hover:opacity-100 hover:text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
+                >
+                  +
+                </button>
+              </div>
+              {tpPrice && Number(tpPrice) <= Number(holding?.current_price) && (
+                <p className="text-[10px] font-semibold text-rose-500 mt-1.5 ml-1">
+                  *Take Profit price must be greater than current price (Rs. {holding.current_price})
+                </p>
+              )}
+              {!slPrice && !tpPrice && (
+                <p className="text-[10px] font-semibold text-amber-500 mt-1.5 ml-1">
+                  *Please set at least one target (Stop Loss or Take Profit)
+                </p>
+              )}
             </div>
 
             <div>
@@ -304,7 +410,7 @@ function ModifyHoldingModal({ isOpen, onClose, holding, onUpdate }) {
               )}
               <button
                 type="submit"
-                disabled={loading || maxSellQuantity <= 0}
+                disabled={loading || maxSellQuantity <= 0 || !isFormValid}
                 className="flex-1 rounded-2xl py-4 font-bold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: "var(--accent)" }}
               >
